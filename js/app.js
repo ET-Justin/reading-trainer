@@ -603,6 +603,8 @@ function handlePracticeAnswer(
     button.disabled = true;
   });
 
+  clickedButton.blur();
+  
   updatePracticeProgress();
 
   setTimeout(() => {
