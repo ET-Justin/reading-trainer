@@ -765,9 +765,9 @@ function startReadingPractice(
 
   Total 33 sentences to learn.
 
-  1
-  2
   3
+  2
+  1
   Start!
 
   각각 1초
@@ -831,9 +831,9 @@ function showPracticeRoundIntro(app) {
 
 
   const sequence = [
-    "1",
-    "2",
     "3",
+    "2",
+    "1",
     "Start!"
   ];
 
@@ -913,11 +913,10 @@ function renderPracticeScreen(app) {
 
         <div class="practice-progress-wrap">
 
-          <div
-            class="practice-progress-text"
-            id="practiceProgressText"
-          ></div>
-
+          <div class="practice-progress-text">
+             <span id="practiceRoundText"></span>
+             <span id="practiceCountText"></span>
+          </div>
           <div
             class="practice-progress-bar"
           >
@@ -1725,9 +1724,14 @@ function updatePracticeProgress() {
   }
 
 
-  const text =
+  const roundText =
     document.getElementById(
-      "practiceProgressText"
+      "practiceRoundText"
+    );
+
+  const countText =
+    document.getElementById(
+      "practiceCountText"
     );
 
 
@@ -1737,7 +1741,7 @@ function updatePracticeProgress() {
     );
 
 
-  if (!text || !fill) {
+  if (!roundText || !countText || !fill) {
     return;
   }
 
@@ -1759,7 +1763,10 @@ function updatePracticeProgress() {
       : 0;
 
 
-  text.textContent =
+  roundText.textContent =
+    `Round ${practiceState.round}`;
+
+  countText.textContent =
     `${completed} / ${total}`;
 
 
