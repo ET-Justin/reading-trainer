@@ -107,11 +107,14 @@ function playSound(name) {
    INITIALIZATION
    ========================================================= */
 
-document.addEventListener(
-  "DOMContentLoaded",
-  init
-);
-
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    init
+  );
+} else {
+  init();
+}
 
 async function init() {
 
