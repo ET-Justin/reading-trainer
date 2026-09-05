@@ -107,49 +107,44 @@ function playSound(name) {
    INITIALIZATION
    ========================================================= */
 
-if (document.readyState === "loading") {
-
-  document.addEventListener(
-    "DOMContentLoaded",
-    initializeReadingTrainer
-  );
-
-} else {
-
-  initializeReadingTrainer();
-}
+initializeReadingTrainer();
 
 
 function initializeReadingTrainer() {
 
-  const params =
-    new URLSearchParams(
-      window.location.search
-    );
+  /*
+    index.html의 Grade / Lesson 선택 화면에서는
+    Reading Trainer 본체를 실행하지 않는다.
+  */
 
   const grade =
     Number(
-      params.get("grade")
+      URL_PARAMS.get("grade")
     );
 
   const lesson =
     Number(
-      params.get("lesson")
+      URL_PARAMS.get("lesson")
     );
 
-
-  /*
-    Grade / Lesson 선택 전에는
-    Reading Trainer 본체를 실행하지 않는다.
-  */
 
   if (
     !grade ||
     !lesson
   ) {
+
+    console.log(
+      "Reading Trainer: waiting for grade and lesson selection."
+    );
+
     return;
   }
 
+
+  /*
+    Lesson이 선택된 상태라면
+    #app을 확실하게 표시한다.
+  */
 
   const app =
     document.getElementById(
@@ -157,33 +152,61 @@ function initializeReadingTrainer() {
     );
 
 
-  if (app) {
+  if (!app) {
 
-    app.classList.remove(
-      "hidden"
+    console.error(
+      "Reading Trainer: #app element not found."
     );
+
+    return;
   }
+
+
+  app.classList.remove(
+    "hidden"
+  );
 
 
   init();
 }
+
 
 async function init() {
 
   const app =
     getAppContainer();
 
+
   try {
 
     showLoading(app);
 
-    const rows =
-      await loadCSV(DATA_PATH);
 
-    validateCSV(rows);
+    console.log(
+      "Reading Trainer starting:",
+      {
+        grade: GRADE_NUMBER,
+        lesson: LESSON_NUMBER,
+        dataPath: DATA_PATH
+      }
+    );
+
+
+    const rows =
+      await loadCSV(
+        DATA_PATH
+      );
+
+
+    validateCSV(
+      rows
+    );
+
 
     currentLesson =
-      buildLessonData(rows);
+      buildLessonData(
+        rows
+      );
 
 
     history.replaceState(
@@ -199,16 +222,27 @@ async function init() {
     window.addEventListener(
       "popstate",
       () => {
-        renderCurrentRoute(app);
+
+        renderCurrentRoute(
+          app
+        );
+
       }
     );
 
 
-    renderCurrentRoute(app);
+    renderCurrentRoute(
+      app
+    );
+
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Reading Trainer initialization failed:",
+      error
+    );
+
 
     renderError(
       app,
