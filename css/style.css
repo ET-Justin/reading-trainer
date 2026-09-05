@@ -141,8 +141,10 @@ body {
   cursor: pointer;
 }
 
-.practice-option:hover {
-  background: #f5f7fb;
+@media (hover: hover) and (pointer: fine) {
+  .practice-option:hover {
+    background: #f5f7fb;
+  }
 }
 
 .practice-option.correct {
