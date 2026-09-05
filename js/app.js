@@ -391,7 +391,9 @@ function startReadingPractice(app, lesson) {
     wrongCount: 0,
     answeredCount: 0,
     currentRow: null,
-    locked: false
+    locked: false,
+    roundAnswered: 0,
+    roundTotal: eligible.length,
   };
 
   renderPracticeScreen(app);
@@ -416,7 +418,18 @@ function renderPracticeScreen(app) {
           ← Lesson Menu
         </button>
 
-        <div class="practice-progress" id="practiceProgress">
+        <div class="practice-progress-wrap">
+          <div
+            class="practice-progress-text"
+            id="practiceProgressText"
+          ></div>
+
+          <div class="practice-progress-bar">
+            <div
+              class="practice-progress-fill"
+              id="practiceProgressFill"
+            ></div>
+          </div>
         </div>
       </div>
 
@@ -551,6 +564,7 @@ function handlePracticeAnswer(
 
   practiceState.locked = true;
   practiceState.answeredCount++;
+  practiceState.roundAnswered++;
 
   const buttons = [
     ...document.querySelectorAll(".practice-option")
@@ -582,7 +596,7 @@ function handlePracticeAnswer(
       practiceState.currentRow
     );
 
-    showPracticeFeedback("Try this sentence again.");
+    showPracticeFeedback("Not quite. You'll see this sentence again.");
   }
 
   buttons.forEach(button => {
@@ -647,7 +661,7 @@ function showPracticeRoundMessage(app) {
     <div class="round-message">
       <h2>Round ${practiceState.round}</h2>
       <p>
-        Let's review the sentences you missed.
+        Review the sentences you missed.
       </p>
     </div>
   `;
@@ -666,19 +680,32 @@ function showPracticeRoundMessage(app) {
    ========================================================= */
 
 function updatePracticeProgress() {
-  const progress =
-    document.getElementById("practiceProgress");
+  if (!practiceState) return;
 
-  if (!progress || !practiceState) return;
+  const text =
+    document.getElementById("practiceProgressText");
 
-  const remaining =
-    practiceState.queue.length;
+  const fill =
+    document.getElementById("practiceProgressFill");
 
-  progress.textContent =
-    `Round ${practiceState.round} · ` +
-    `${remaining} left`;
+  if (!text || !fill) return;
+
+  const completed =
+    practiceState.roundAnswered;
+
+  const total =
+    practiceState.roundTotal;
+
+  const percent =
+    total > 0
+      ? (completed / total) * 100
+      : 0;
+
+  text.textContent =
+    `${completed} / ${total}`;
+
+  fill.style.width = `${percent}%`;
 }
-
 
 /* =========================================================
    RESULT
@@ -705,10 +732,8 @@ function renderPracticeResult(app) {
         <p class="result-message">
           ${
             allMastered
-              ? "You understood all the sentences."
-              : `${unresolved} sentence${
-                  unresolved === 1 ? "" : "s"
-                } still need review.`
+              ? "You got all the sentences right."
+              : `Review ${unresolved} sentence${unresolved === 1 ? "" : "s"} and try again.`
           }
         </p>
 
