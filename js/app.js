@@ -5,8 +5,24 @@
    CONFIG
    ========================================================= */
 
-const DATA_PATH = "data/2022M1L05R.csv";
-const LESSON_NUMBER = 5;
+const URL_PARAMS =
+  new URLSearchParams(
+    window.location.search
+  );
+
+const GRADE_NUMBER =
+  Number(
+    URL_PARAMS.get("grade")
+  ) || 1;
+
+const LESSON_NUMBER =
+  Number(
+    URL_PARAMS.get("lesson")
+  ) || 5;
+
+const DATA_PATH =
+  `data/2022M${GRADE_NUMBER}` +
+  `L${String(LESSON_NUMBER).padStart(2, "0")}R.csv`;
 
 const MAX_PRACTICE_ROUNDS = 3;
 
