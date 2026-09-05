@@ -108,11 +108,63 @@ function playSound(name) {
    ========================================================= */
 
 if (document.readyState === "loading") {
+
   document.addEventListener(
     "DOMContentLoaded",
-    init
+    initializeReadingTrainer
   );
+
 } else {
+
+  initializeReadingTrainer();
+}
+
+
+function initializeReadingTrainer() {
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  const grade =
+    Number(
+      params.get("grade")
+    );
+
+  const lesson =
+    Number(
+      params.get("lesson")
+    );
+
+
+  /*
+    Grade / Lesson 선택 전에는
+    Reading Trainer 본체를 실행하지 않는다.
+  */
+
+  if (
+    !grade ||
+    !lesson
+  ) {
+    return;
+  }
+
+
+  const app =
+    document.getElementById(
+      "app"
+    );
+
+
+  if (app) {
+
+    app.classList.remove(
+      "hidden"
+    );
+  }
+
+
   init();
 }
 
