@@ -20,16 +20,27 @@
   <style>
 
     /* =====================================================
-       GRADE / LESSON SELECTOR
+       PAGE / LAUNCHER
        ===================================================== */
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+    }
 
     .page-wrapper {
       min-height: 100vh;
-
       display: flex;
       flex-direction: column;
     }
-
 
     .launcher-container {
       width: 100%;
@@ -45,11 +56,9 @@
       align-items: center;
     }
 
-
     .launcher-screen {
       width: 100%;
     }
-
 
     .launcher-title {
       margin: 5px 0 6px;
@@ -60,7 +69,6 @@
       font-weight: 800;
     }
 
-
     .launcher-subtitle {
       margin-bottom: 24px;
 
@@ -68,7 +76,6 @@
 
       color: #666;
     }
-
 
     .launcher-card {
       width: 100%;
@@ -86,25 +93,19 @@
         rgba(0, 0, 0, 0.07);
     }
 
-
     .launcher-grid {
       display: grid;
-
       gap: 12px;
     }
 
-
-    .launcher-button {
+    .launcher-button,
+    .launcher-back {
       width: 100%;
-
-      padding: 15px 12px;
 
       border: none;
       border-radius: 14px;
 
-      background: #e9eef9;
-
-      color: #222;
+      padding: 15px 12px;
 
       font-size: 1rem;
       font-weight: 700;
@@ -115,11 +116,20 @@
       touch-action: manipulation;
     }
 
-
-    .launcher-button:active {
-      transform: scale(0.98);
+    .launcher-button {
+      background: #e9eef9;
+      color: #222;
     }
 
+    .launcher-back {
+      background: #eef1f6;
+      color: #444;
+    }
+
+    .launcher-button:active,
+    .launcher-back:active {
+      transform: scale(0.98);
+    }
 
     @media (hover: hover) and (pointer: fine) {
 
@@ -127,27 +137,10 @@
         background: #dde5f5;
       }
 
+      .launcher-back:hover {
+        background: #e4e8ef;
+      }
     }
-
-
-    .launcher-back {
-      width: 100%;
-
-      padding: 14px 12px;
-
-      border: none;
-      border-radius: 14px;
-
-      background: #eef1f6;
-
-      color: #444;
-
-      font-size: 0.95rem;
-      font-weight: 700;
-
-      cursor: pointer;
-    }
-
 
     .launcher-loading {
       padding: 18px 0;
@@ -158,7 +151,6 @@
 
       font-size: 0.9rem;
     }
-
 
     .launcher-note {
       padding: 6px 2px;
@@ -171,11 +163,9 @@
       text-align: center;
     }
 
-
     .hidden {
       display: none !important;
     }
-
 
     footer {
       width: 100%;
@@ -190,18 +180,11 @@
       line-height: 1.55;
     }
 
-
-    #sourceLine {
-      display: inline;
-    }
-
-
     @media (max-width: 430px) {
 
       .launcher-title {
         font-size: 1.55rem;
       }
-
     }
 
   </style>
@@ -250,7 +233,6 @@
           Grade 1
         </button>
 
-
         <button
           type="button"
           class="launcher-button"
@@ -258,7 +240,6 @@
         >
           Grade 2
         </button>
-
 
         <button
           type="button"
@@ -284,9 +265,7 @@
       <h1
         class="launcher-title"
         id="gradeTitle"
-      >
-      </h1>
-
+      ></h1>
 
       <div class="launcher-subtitle">
         Choose a Lesson
@@ -302,12 +281,10 @@
           🔎 Looking for lessons...
         </div>
 
-
         <div
           id="lessonButtons"
           class="launcher-grid"
-        >
-        </div>
+        ></div>
 
       </div>
 
@@ -328,14 +305,13 @@
 
   <!-- =====================================================
        READING TRAINER APP
-       app.js가 이 영역을 사용
+       app.js renders into this area
        ===================================================== -->
 
   <main
     id="app"
     class="hidden"
-  >
-  </main>
+  ></main>
 
 
 
@@ -373,7 +349,7 @@ let selectedGrade = null;
 
 
 /* =========================================================
-   URL
+   URL STATE
    ========================================================= */
 
 function getUrlSelection() {
@@ -414,7 +390,31 @@ function getUrlSelection() {
 
 
 /* =========================================================
-   SCREEN
+   SOURCE DISPLAY
+   ========================================================= */
+
+function showSource(show) {
+
+  const source =
+    document.getElementById(
+      "sourceLine"
+    );
+
+
+  if (!source) {
+    return;
+  }
+
+
+  source.classList.toggle(
+    "hidden",
+    !show
+  );
+}
+
+
+/* =========================================================
+   GRADE SCREEN
    ========================================================= */
 
 function showGradeScreen() {
@@ -461,6 +461,10 @@ function showGradeScreen() {
   showSource(false);
 }
 
+
+/* =========================================================
+   LESSON SCREEN
+   ========================================================= */
 
 function showLessonScreen(
   grade
@@ -518,26 +522,21 @@ function showLessonScreen(
 }
 
 
-function showSource(show) {
-
-  const source =
-    document.getElementById(
-      "sourceLine"
-    );
-
-
-  source.classList.toggle(
-    "hidden",
-    !show
-  );
-}
-
-
 /* =========================================================
-   GRADE
+   SELECT GRADE
    ========================================================= */
 
 function selectGrade(grade) {
+
+  history.pushState(
+    {
+      screen: "lessons",
+      grade
+    },
+    "",
+    window.location.pathname
+  );
+
 
   showLessonScreen(
     grade
@@ -549,6 +548,10 @@ function selectGrade(grade) {
   );
 }
 
+
+/* =========================================================
+   BACK TO GRADES
+   ========================================================= */
 
 function backToGrades() {
 
@@ -566,22 +569,20 @@ function backToGrades() {
 
 
 /* =========================================================
-   CSV FILE NAME
+   CSV PATH
    ========================================================= */
 
 /*
 
-  Example:
+  Examples
 
-  Grade 1
-  Lesson 5
-
-  →
-
+  Grade 1 · Lesson 5
   data/2022M1L05R.csv
 
-*/
+  Grade 2 · Lesson 3
+  data/2022M2L03R.csv
 
+*/
 
 function getReadingCsvPath(
   grade,
@@ -604,7 +605,7 @@ function getReadingCsvPath(
 
 
 /* =========================================================
-   LESSON DISCOVERY
+   DISCOVER LESSONS
    ========================================================= */
 
 async function discoverLessons(
@@ -655,7 +656,7 @@ async function discoverLessons(
     );
 
 
-  const found = [];
+  const foundLessons = [];
 
 
   results.forEach(
@@ -666,7 +667,7 @@ async function discoverLessons(
 
       if (exists) {
 
-        found.push(
+        foundLessons.push(
           index + 1
         );
       }
@@ -681,13 +682,13 @@ async function discoverLessons(
 
   renderLessonButtons(
     grade,
-    found
+    foundLessons
   );
 }
 
 
 /* =========================================================
-   CHECK FILE
+   CHECK CSV EXISTENCE
    ========================================================= */
 
 async function checkLessonExists(
@@ -723,7 +724,7 @@ async function checkLessonExists(
 
 
 /* =========================================================
-   LESSON BUTTONS
+   RENDER LESSON BUTTONS
    ========================================================= */
 
 function renderLessonButtons(
@@ -809,7 +810,6 @@ function openLesson(
 
 
   url.search = "";
-
   url.hash = "";
 
 
@@ -832,7 +832,7 @@ function openLesson(
 
 
 /* =========================================================
-   BROWSER HISTORY
+   BROWSER BACK / FORWARD
    ========================================================= */
 
 window.addEventListener(
@@ -851,13 +851,37 @@ window.addEventListener(
     }
 
 
+    const state =
+      history.state;
+
+
+    if (
+      state &&
+      state.screen === "lessons" &&
+      state.grade
+    ) {
+
+      showLessonScreen(
+        state.grade
+      );
+
+
+      discoverLessons(
+        state.grade
+      );
+
+
+      return;
+    }
+
+
     showGradeScreen();
   }
 );
 
 
 /* =========================================================
-   START
+   INITIAL LAUNCHER STATE
    ========================================================= */
 
 document.addEventListener(
@@ -868,12 +892,14 @@ document.addEventListener(
       getUrlSelection();
 
 
-    if (selection) {
+    /*
+      Grade + Lesson already selected.
 
-      /*
-        실제 Reading Trainer는
-        app.js가 렌더링한다.
-      */
+      app.js will initialize the real
+      Reading Trainer.
+    */
+
+    if (selection) {
 
       document
         .getElementById(
@@ -895,44 +921,28 @@ document.addEventListener(
 
       showSource(false);
 
-
-      loadReadingTrainer();
-
       return;
     }
 
+
+    /*
+      Initial screen
+    */
 
     showGradeScreen();
   }
 );
 
-
-/* =========================================================
-   LOAD APP.JS
-   ========================================================= */
-
-function loadReadingTrainer() {
-
-  const script =
-    document.createElement(
-      "script"
-    );
-
-
-  script.src =
-    "js/app.js";
-
-
-  script.defer =
-    true;
-
-
-  document.body.appendChild(
-    script
-  );
-}
-
 </script>
+
+
+<!-- =======================================================
+     READING TRAINER
+     Always loaded.
+     app.js itself decides whether grade/lesson are selected.
+     ======================================================= -->
+
+<script src="js/app.js"></script>
 
 
 </body>
