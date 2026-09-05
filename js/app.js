@@ -10,8 +10,16 @@ const LESSON_NUMBER = 5;
 
 const MAX_PRACTICE_ROUNDS = 3;
 
-const CORRECT_FEEDBACK_MS = 900;
-const WRONG_FEEDBACK_MS = 2500;
+const CORRECT_FEEDBACK_MS = 1000;
+const WRONG_FEEDBACK_MS = 3000;
+
+const TEST_QUESTION_COUNT = 20;
+const TEST_TIME_LIMIT_MS = 10000;
+
+const FEEDBACK_COLORS = {
+  correct: "#237a45",
+  wrong: "#8b2f2f"
+};
 
 const SOUND_PATHS = {
   correct: "sound/correct.mp3",
@@ -25,10 +33,15 @@ const SOUND_PATHS = {
    ========================================================= */
 
 let currentLesson = null;
-let practiceState = null;
 
+let practiceState = null;
 let practiceFeedbackTimer = null;
 let roundIntroTimer = null;
+
+let testState = null;
+let testFeedbackTimer = null;
+let testTimeoutTimer = null;
+let testAnimationFrame = null;
 
 
 /* =========================================================
@@ -41,68 +54,67 @@ const sounds = {
   victory: new Audio(SOUND_PATHS.victory)
 };
 
+
 Object.values(sounds).forEach(audio => {
   audio.preload = "auto";
 });
 
 
 function playSound(name) {
+
   const audio = sounds[name];
 
   if (!audio) return;
 
   try {
+
     audio.pause();
     audio.currentTime = 0;
 
     const promise = audio.play();
 
     if (promise !== undefined) {
-      promise.catch(() => {
-        // 브라우저 자동 재생 제한 등은 무시
-      });
+      promise.catch(() => {});
     }
+
   } catch (error) {
-    console.warn(`Sound error: ${name}`, error);
+
+    console.warn(
+      `Sound error: ${name}`,
+      error
+    );
   }
 }
-
-
-/*
-  Practice와 Test가 모두 이 함수를 사용합니다.
-
-  playSound("correct");
-  playSound("wrong");
-  playSound("victory");
-*/
 
 
 /* =========================================================
    INITIALIZATION
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener(
+  "DOMContentLoaded",
+  init
+);
 
 
 async function init() {
-  const app = getAppContainer();
+
+  const app =
+    getAppContainer();
 
   try {
+
     showLoading(app);
 
-    const rows = await loadCSV(DATA_PATH);
+    const rows =
+      await loadCSV(DATA_PATH);
 
     validateCSV(rows);
 
-    currentLesson = buildLessonData(rows);
+    currentLesson =
+      buildLessonData(rows);
 
-    /*
-      현재 URL을 browser history의 첫 상태로 등록.
-      예:
-        /reading-trainer/
-        /reading-trainer/#practice
-        /reading-trainer/#test
-    */
+
     history.replaceState(
       {
         readingTrainer: true,
@@ -112,15 +124,25 @@ async function init() {
       window.location.href
     );
 
-    window.addEventListener("popstate", () => {
-      renderCurrentRoute(app);
-    });
+
+    window.addEventListener(
+      "popstate",
+      () => {
+        renderCurrentRoute(app);
+      }
+    );
+
 
     renderCurrentRoute(app);
 
   } catch (error) {
+
     console.error(error);
-    renderError(app, error);
+
+    renderError(
+      app,
+      error
+    );
   }
 }
 
@@ -130,14 +152,21 @@ async function init() {
    ========================================================= */
 
 function getAppContainer() {
-  let app = document.getElementById("app");
+
+  let app =
+    document.getElementById("app");
+
 
   if (!app) {
-    app = document.createElement("main");
+
+    app =
+      document.createElement("main");
+
     app.id = "app";
 
     document.body.appendChild(app);
   }
+
 
   return app;
 }
@@ -148,20 +177,21 @@ function getAppContainer() {
    ========================================================= */
 
 /*
-  URL:
 
-  Lesson Menu
   /reading-trainer/
+      Lesson Menu
 
-  Reading Practice
   /reading-trainer/#practice
+      Reading Practice
 
-  Reading Test
   /reading-trainer/#test
+      Reading Test
+
 */
 
 
 function getCurrentRoute() {
+
   return window.location.hash
     .replace(/^#/, "")
     .trim()
@@ -170,11 +200,15 @@ function getCurrentRoute() {
 
 
 function navigateTo(route) {
-  clearPracticeTimers();
 
-  const hash = route
-    ? `#${route}`
-    : window.location.pathname;
+  clearPracticeTimers();
+  clearTestTimers();
+
+  const url =
+    route
+      ? `#${route}`
+      : window.location.pathname;
+
 
   history.pushState(
     {
@@ -182,8 +216,9 @@ function navigateTo(route) {
       route
     },
     "",
-    hash
+    url
   );
+
 
   renderCurrentRoute(
     document.getElementById("app")
@@ -192,11 +227,16 @@ function navigateTo(route) {
 
 
 function renderCurrentRoute(app) {
-  clearPracticeTimers();
 
-  const route = getCurrentRoute();
+  clearPracticeTimers();
+  clearTestTimers();
+
+  const route =
+    getCurrentRoute();
+
 
   if (route === "practice") {
+
     startReadingPractice(
       app,
       currentLesson
@@ -205,12 +245,12 @@ function renderCurrentRoute(app) {
     return;
   }
 
+
   if (route === "test") {
-    /*
-      Reading Test는 다음 단계에서 구현.
-      URL 구조는 지금부터 분리해 둠.
-    */
-    renderTestPlaceholder(
+
+    practiceState = null;
+
+    renderTestStart(
       app,
       currentLesson
     );
@@ -218,7 +258,9 @@ function renderCurrentRoute(app) {
     return;
   }
 
+
   practiceState = null;
+  testState = null;
 
   renderLessonMenu(
     app,
@@ -228,10 +270,7 @@ function renderCurrentRoute(app) {
 
 
 function goBackToLessonMenu() {
-  /*
-    Lesson Menu에서 Practice/Test를 눌러 들어온 경우
-    browser history의 바로 이전 항목이 Lesson Menu.
-  */
+
   history.back();
 }
 
@@ -241,20 +280,34 @@ function goBackToLessonMenu() {
    ========================================================= */
 
 async function loadCSV(path) {
-  const response = await fetch(path, {
-    cache: "no-store"
-  });
+
+  const response =
+    await fetch(
+      path,
+      {
+        cache: "no-store"
+      }
+    );
+
 
   if (!response.ok) {
+
     throw new Error(
       `CSV 파일을 불러오지 못했습니다. (${response.status})`
     );
   }
 
-  let text = await response.text();
 
-  // UTF-8 BOM 제거
-  text = text.replace(/^\uFEFF/, "");
+  let text =
+    await response.text();
+
+
+  text =
+    text.replace(
+      /^\uFEFF/,
+      ""
+    );
+
 
   return parseCSV(text);
 }
@@ -264,43 +317,55 @@ async function loadCSV(path) {
    CSV PARSER
    ========================================================= */
 
-/*
-  RFC 스타일 CSV의 핵심 기능 처리:
-
-  - 쉼표
-  - 큰따옴표
-  - "" 이스케이프
-  - 셀 내부 줄바꿈
-*/
-
 function parseCSV(text) {
+
   const table = [];
 
   let row = [];
   let field = "";
   let inQuotes = false;
 
-  for (let i = 0; i < text.length; i++) {
 
-    const char = text[i];
-    const next = text[i + 1];
+  for (
+    let i = 0;
+    i < text.length;
+    i++
+  ) {
+
+    const char =
+      text[i];
+
+    const next =
+      text[i + 1];
+
 
     if (char === '"') {
 
-      if (inQuotes && next === '"') {
+      if (
+        inQuotes &&
+        next === '"'
+      ) {
+
         field += '"';
         i++;
+
       } else {
-        inQuotes = !inQuotes;
+
+        inQuotes =
+          !inQuotes;
       }
 
       continue;
     }
 
 
-    if (char === "," && !inQuotes) {
+    if (
+      char === "," &&
+      !inQuotes
+    ) {
 
       row.push(field);
+
       field = "";
 
       continue;
@@ -308,7 +373,10 @@ function parseCSV(text) {
 
 
     if (
-      (char === "\n" || char === "\r") &&
+      (
+        char === "\n" ||
+        char === "\r"
+      ) &&
       !inQuotes
     ) {
 
@@ -319,14 +387,21 @@ function parseCSV(text) {
         i++;
       }
 
+
       row.push(field);
+
       field = "";
 
+
       if (
-        row.some(cell => cell !== "")
+        row.some(
+          cell => cell !== ""
+        )
       ) {
+
         table.push(row);
       }
+
 
       row = [];
 
@@ -345,15 +420,20 @@ function parseCSV(text) {
 
     row.push(field);
 
+
     if (
-      row.some(cell => cell !== "")
+      row.some(
+        cell => cell !== ""
+      )
     ) {
+
       table.push(row);
     }
   }
 
 
   if (table.length < 2) {
+
     throw new Error(
       "CSV에 데이터가 없습니다."
     );
@@ -361,8 +441,9 @@ function parseCSV(text) {
 
 
   const headers =
-    table[0].map(header =>
-      header.trim()
+    table[0].map(
+      header =>
+        header.trim()
     );
 
 
@@ -372,6 +453,7 @@ function parseCSV(text) {
 
       const object = {};
 
+
       headers.forEach(
         (header, index) => {
 
@@ -379,6 +461,7 @@ function parseCSV(text) {
             values[index] ?? "";
         }
       );
+
 
       return object;
     });
@@ -402,13 +485,16 @@ function validateCSV(rows) {
 
 
   if (!rows.length) {
+
     throw new Error(
       "CSV에 읽을 데이터가 없습니다."
     );
   }
 
 
-  const firstRow = rows[0];
+  const firstRow =
+    rows[0];
+
 
   for (
     const column
@@ -416,6 +502,7 @@ function validateCSV(rows) {
   ) {
 
     if (!(column in firstRow)) {
+
       throw new Error(
         `필수 열이 없습니다: ${column}`
       );
@@ -423,14 +510,18 @@ function validateCSV(rows) {
   }
 
 
-  const ids = new Set();
+  const ids =
+    new Set();
 
 
   for (const row of rows) {
 
-    const id = row.id.trim();
+    const id =
+      row.id.trim();
+
 
     if (!id) {
+
       throw new Error(
         "ID가 없는 행이 있습니다."
       );
@@ -438,6 +529,7 @@ function validateCSV(rows) {
 
 
     if (ids.has(id)) {
+
       throw new Error(
         `중복된 ID가 있습니다: ${id}`
       );
@@ -446,11 +538,6 @@ function validateCSV(rows) {
 
     ids.add(id);
   }
-
-
-  console.log(
-    `CSV loaded: ${rows.length} rows`
-  );
 }
 
 
@@ -461,26 +548,36 @@ function validateCSV(rows) {
 function buildLessonData(rows) {
 
   const titleRow =
-    rows.find(row =>
-      row.id.endsWith("0000")
+    rows.find(
+      row =>
+        row.id.endsWith("0000")
     );
 
 
-  const title = titleRow
-    ? cleanEnglish(titleRow.english)
-    : "Reading";
+  const title =
+    titleRow
+      ? cleanEnglish(
+          titleRow.english
+        )
+      : "Reading";
 
 
   const sentences =
-    rows.filter(row =>
-      isSentenceRow(row)
+    rows.filter(
+      row =>
+        isSentenceRow(row)
     );
 
 
   return {
-    lessonNumber: LESSON_NUMBER,
+
+    lessonNumber:
+      LESSON_NUMBER,
+
     title,
+
     rows,
+
     sentences
   };
 }
@@ -492,24 +589,19 @@ function buildLessonData(rows) {
 
 function isSentenceRow(row) {
 
-  const id = row.id.trim();
+  const id =
+    row.id.trim();
 
 
   if (!/^\d{7}$/.test(id)) {
+
     return false;
   }
 
 
-  const sentenceNumber =
-    id.slice(-2);
-
-
-  /*
-    00:
-    제목 / 날짜 / 소제목
-  */
-
-  return sentenceNumber !== "00";
+  return (
+    id.slice(-2) !== "00"
+  );
 }
 
 
@@ -517,23 +609,36 @@ function isSentenceRow(row) {
    ANNOTATION CLEANING
    ========================================================= */
 
-/*
-  CSV english 내부 메타데이터
-
-  " / "     chunk
-  {...}     Find the Error
-  **...**   Random Blank 제외
-
-  학생 화면에서는 제거
-*/
-
 function cleanEnglish(text) {
 
   return text
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\{(.*?)\}/g, "$1")
-    .replace(/ \/ /g, " ")
+    .replace(
+      /\*\*(.*?)\*\*/g,
+      "$1"
+    )
+    .replace(
+      /\{(.*?)\}/g,
+      "$1"
+    )
+    .replace(
+      / \/ /g,
+      " "
+    )
     .trim();
+}
+
+
+function cleanInlineMetadata(text) {
+
+  return text
+    .replace(
+      /\*\*(.*?)\*\*/g,
+      "$1"
+    )
+    .replace(
+      / \/ /g,
+      " "
+    );
 }
 
 
@@ -541,20 +646,29 @@ function cleanEnglish(text) {
    LESSON MENU
    ========================================================= */
 
-function renderLessonMenu(app, lesson) {
+function renderLessonMenu(
+  app,
+  lesson
+) {
 
   app.innerHTML = "";
 
 
   const section =
-    document.createElement("section");
+    document.createElement(
+      "section"
+    );
+
 
   section.className =
     "lesson-menu";
 
 
   const heading =
-    document.createElement("h1");
+    document.createElement(
+      "h1"
+    );
+
 
   heading.className =
     "lesson-heading";
@@ -564,7 +678,10 @@ function renderLessonMenu(app, lesson) {
 
 
   const title =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
+
 
   title.className =
     "reading-title";
@@ -574,7 +691,10 @@ function renderLessonMenu(app, lesson) {
 
 
   const buttons =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
+
 
   buttons.className =
     "lesson-buttons";
@@ -589,7 +709,7 @@ function renderLessonMenu(app, lesson) {
 
   const testButton =
     createButton(
-      "Reading Test",
+      "📝 Reading Test",
       "test-button"
     );
 
@@ -618,6 +738,7 @@ function renderLessonMenu(app, lesson) {
 
   const info =
     document.createElement("p");
+
 
   info.className =
     "data-status";
@@ -648,7 +769,9 @@ function createButton(
 ) {
 
   const button =
-    document.createElement("button");
+    document.createElement(
+      "button"
+    );
 
 
   button.type = "button";
@@ -665,7 +788,58 @@ function createButton(
 
 
 /* =========================================================
-   READING PRACTICE — START
+   COMMON FEEDBACK
+   ========================================================= */
+
+function showFeedback(
+  element,
+  message,
+  type
+) {
+
+  if (!element) return;
+
+
+  element.textContent =
+    message;
+
+
+  element.classList.remove(
+    "feedback-correct",
+    "feedback-wrong"
+  );
+
+
+  if (type === "correct") {
+
+    element.classList.add(
+      "feedback-correct"
+    );
+
+    element.style.color =
+      FEEDBACK_COLORS.correct;
+
+  } else {
+
+    element.classList.add(
+      "feedback-wrong"
+    );
+
+    element.style.color =
+      FEEDBACK_COLORS.wrong;
+  }
+}
+
+
+/* =========================================================
+   =========================================================
+   READING PRACTICE
+   =========================================================
+   ========================================================= */
+
+
+/* =========================================================
+   PRACTICE START
    ========================================================= */
 
 function startReadingPractice(
@@ -676,17 +850,13 @@ function startReadingPractice(
   clearPracticeTimers();
 
 
-  /*
-    Practice 사용 가능 문장:
-
-    - 영어 문장 존재
-    - 한국어 뜻 존재
-  */
-
   const eligible =
-    lesson.sentences.filter(row =>
-      cleanEnglish(row.english) &&
-      row.korean.trim()
+    lesson.sentences.filter(
+      row =>
+        cleanEnglish(
+          row.english
+        ) &&
+        row.korean.trim()
     );
 
 
@@ -707,30 +877,15 @@ function startReadingPractice(
 
     round: 1,
 
-    /*
-      Round 1:
-      모든 문장
-    */
-
     queue:
       shuffleArray([
         ...eligible
       ]),
 
-    /*
-      이번 round에서 틀린 문장
-    */
-
     retryQueue: [],
 
-    /*
-      전체 Passage의 문장.
-      Korean → English 오답 생성에 사용.
-    */
-
-    allSentences: [
-      ...eligible
-    ],
+    allSentences:
+      [...eligible],
 
     totalSentences:
       eligible.length,
@@ -760,20 +915,6 @@ function startReadingPractice(
    PRACTICE ROUND INTRO
    ========================================================= */
 
-/*
-  Round 1
-
-  Total 33 sentences to learn.
-
-  3
-  2
-  1
-  Start!
-
-  각각 1초
-*/
-
-
 function showPracticeRoundIntro(app) {
 
   if (!practiceState) return;
@@ -785,10 +926,8 @@ function showPracticeRoundIntro(app) {
   const round =
     practiceState.round;
 
-
   const total =
     practiceState.roundTotal;
-
 
   const purpose =
     round === 1
@@ -815,7 +954,7 @@ function showPracticeRoundIntro(app) {
           class="round-countdown"
           id="roundCountdown"
         >
-          1
+          3
         </div>
 
       </div>
@@ -910,28 +1049,23 @@ function renderPracticeScreen(app) {
           ← Lesson Menu
         </button>
 
-
         <div class="practice-progress-wrap">
 
           <div class="practice-progress-text">
-             <span id="practiceRoundText"></span>
-             <span id="practiceCountText"></span>
+            <span id="practiceRoundText"></span>
+            <span id="practiceCountText"></span>
           </div>
-          <div
-            class="practice-progress-bar"
-          >
 
+          <div class="practice-progress-bar">
             <div
               class="practice-progress-fill"
               id="practiceProgressFill"
             ></div>
-
           </div>
 
         </div>
 
       </div>
-
 
       <div class="practice-card">
 
@@ -940,18 +1074,15 @@ function renderPracticeScreen(app) {
           id="practiceLabel"
         ></div>
 
-
         <div
           class="practice-question"
           id="practiceQuestion"
         ></div>
 
-
         <div
           class="practice-options"
           id="practiceOptions"
         ></div>
-
 
         <div
           class="practice-feedback"
@@ -970,11 +1101,7 @@ function renderPracticeScreen(app) {
     )
     .addEventListener(
       "click",
-      () => {
-
-        goBackToLessonMenu();
-
-      }
+      goBackToLessonMenu
     );
 
 
@@ -983,14 +1110,12 @@ function renderPracticeScreen(app) {
 
 
 /* =========================================================
-   PRACTICE QUESTION SELECTION
+   PRACTICE NEXT QUESTION
    ========================================================= */
 
 function showNextPracticeQuestion(app) {
 
-  if (!practiceState) {
-    return;
-  }
+  if (!practiceState) return;
 
 
   if (
@@ -1013,16 +1138,6 @@ function showNextPracticeQuestion(app) {
   practiceState.locked =
     false;
 
-
-  /*
-    매 문장마다 문제 유형을 새로 랜덤 결정.
-
-    따라서:
-    - 유형별 개수도 매번 다름
-    - 유형 순서도 매번 다름
-    - Round 2/3에서 같은 문장이
-      다른 유형으로 나올 수 있음
-  */
 
   const type =
     choosePracticeQuestionType(row);
@@ -1055,45 +1170,35 @@ function showNextPracticeQuestion(app) {
 
 
 /* =========================================================
-   PRACTICE TYPE RANDOMIZER
+   PRACTICE TYPE
    ========================================================= */
 
 function choosePracticeQuestionType(row) {
 
   const koreanDistractors =
-    row.korean_distractors
-      .split(";")
-      .map(item => item.trim())
-      .filter(Boolean);
+    splitSemicolon(
+      row.korean_distractors
+    );
 
-
-  /*
-    Korean distractor가 충분하면
-    50:50 랜덤.
-  */
 
   if (
     koreanDistractors.length >= 3
   ) {
 
-    return Math.random() < 0.5
-      ? "ENGLISH_TO_KOREAN"
-      : "KOREAN_TO_ENGLISH";
+    return (
+      Math.random() < 0.5
+        ? "ENGLISH_TO_KOREAN"
+        : "KOREAN_TO_ENGLISH"
+    );
   }
 
-
-  /*
-    한국어 오답 데이터가 부족하면
-    Korean → English만 사용.
-  */
 
   return "KOREAN_TO_ENGLISH";
 }
 
 
 /* =========================================================
-   TYPE 1
-   ENGLISH → KOREAN
+   PRACTICE: ENGLISH → KOREAN
    ========================================================= */
 
 function renderEnglishToKoreanQuestion(
@@ -1117,30 +1222,28 @@ function renderEnglishToKoreanQuestion(
 
 
   question.textContent =
-    cleanEnglish(row.english);
+    cleanEnglish(
+      row.english
+    );
 
 
   const distractors =
-    row.korean_distractors
-      .split(";")
-      .map(item => item.trim())
-      .filter(Boolean);
-
-
-  const selectedDistractors =
-    shuffleArray([
-      ...distractors
-    ]).slice(0, 3);
+    shuffleArray(
+      splitSemicolon(
+        row.korean_distractors
+      )
+    ).slice(0, 3);
 
 
   const options =
     shuffleArray([
       {
-        text: row.korean.trim(),
+        text:
+          row.korean.trim(),
         correct: true
       },
 
-      ...selectedDistractors.map(
+      ...distractors.map(
         text => ({
           text,
           correct: false
@@ -1157,8 +1260,7 @@ function renderEnglishToKoreanQuestion(
 
 
 /* =========================================================
-   TYPE 2
-   KOREAN → ENGLISH
+   PRACTICE: KOREAN → ENGLISH
    ========================================================= */
 
 function renderKoreanToEnglishQuestion(
@@ -1170,7 +1272,6 @@ function renderKoreanToEnglishQuestion(
     document.getElementById(
       "practiceLabel"
     );
-
 
   const question =
     document.getElementById(
@@ -1196,22 +1297,20 @@ function renderKoreanToEnglishQuestion(
 
   const options =
     shuffleArray([
-
       {
         text:
-          cleanEnglish(row.english),
-
+          cleanEnglish(
+            row.english
+          ),
         correct: true
       },
 
       ...distractorRows.map(
         distractorRow => ({
-
           text:
             cleanEnglish(
               distractorRow.english
             ),
-
           correct: false
         })
       )
@@ -1226,19 +1325,8 @@ function renderKoreanToEnglishQuestion(
 
 
 /* =========================================================
-   KOREAN → ENGLISH DISTRACTORS
+   PRACTICE ENGLISH DISTRACTORS
    ========================================================= */
-
-/*
-  해당 지문 전체에서 오답 문장 3개를 선택.
-
-  1차 후보:
-  정답과 단어 수 차이 ±5
-
-  후보가 3개 미만이면:
-  나머지 전체 문장 중에서 보충.
-*/
-
 
 function getEnglishDistractorRows(
   correctRow,
@@ -1246,35 +1334,30 @@ function getEnglishDistractorRows(
   count
 ) {
 
-  const correctText =
-    cleanEnglish(
-      correctRow.english
-    );
-
-
   const correctWordCount =
-    countWords(correctText);
+    countWords(
+      cleanEnglish(
+        correctRow.english
+      )
+    );
 
 
   const otherRows =
     allRows.filter(
       row =>
-        row.id !== correctRow.id
+        row.id !==
+        correctRow.id
     );
 
 
   const closeRows =
     otherRows.filter(row => {
 
-      const candidateText =
-        cleanEnglish(
-          row.english
-        );
-
-
       const candidateCount =
         countWords(
-          candidateText
+          cleanEnglish(
+            row.english
+          )
         );
 
 
@@ -1288,15 +1371,13 @@ function getEnglishDistractorRows(
 
 
   const selected =
-    shuffleArray([
-      ...closeRows
-    ]).slice(0, count);
+    shuffleArray(
+      [...closeRows]
+    ).slice(
+      0,
+      count
+    );
 
-
-  /*
-    ±5 후보가 부족하면
-    제한 없이 나머지 문장에서 보충
-  */
 
   if (
     selected.length < count
@@ -1304,53 +1385,34 @@ function getEnglishDistractorRows(
 
     const selectedIds =
       new Set(
-        selected.map(row => row.id)
+        selected.map(
+          row => row.id
+        )
       );
 
 
     const remaining =
       otherRows.filter(
         row =>
-          !selectedIds.has(row.id)
+          !selectedIds.has(
+            row.id
+          )
       );
 
 
-    const extra =
-      shuffleArray([
-        ...remaining
-      ]).slice(
+    selected.push(
+      ...shuffleArray(
+        [...remaining]
+      ).slice(
         0,
-        count - selected.length
-      );
-
-
-    selected.push(...extra);
+        count -
+        selected.length
+      )
+    );
   }
 
 
   return selected;
-}
-
-
-/* =========================================================
-   WORD COUNT
-   ========================================================= */
-
-function countWords(text) {
-
-  const cleaned =
-    text.trim();
-
-
-  if (!cleaned) {
-    return 0;
-  }
-
-
-  return cleaned
-    .split(/\s+/)
-    .filter(Boolean)
-    .length;
 }
 
 
@@ -1367,7 +1429,6 @@ function renderPracticeOptions(
     document.getElementById(
       "practiceOptions"
     );
-
 
   const feedback =
     document.getElementById(
@@ -1388,7 +1449,8 @@ function renderPracticeOptions(
       );
 
 
-    button.type = "button";
+    button.type =
+      "button";
 
     button.className =
       "practice-option";
@@ -1406,7 +1468,6 @@ function renderPracticeOptions(
           button,
           option
         );
-
       }
     );
 
@@ -1437,7 +1498,6 @@ function handlePracticeAnswer(
 
 
   practiceState.locked = true;
-
   practiceState.roundAnswered++;
 
 
@@ -1448,36 +1508,35 @@ function handlePracticeAnswer(
   ];
 
 
-  /*
-    Correct
-  */
+  const feedback =
+    document.getElementById(
+      "practiceFeedback"
+    );
+
 
   if (selectedOption.correct) {
 
     practiceState.correctCount++;
 
+
     clickedButton.classList.add(
       "correct"
     );
 
-    showPracticeFeedback(
-      "Correct!"
+
+    showFeedback(
+      feedback,
+      "Correct!",
+      "correct"
     );
+
 
     playSound("correct");
 
 
-    disablePracticeOptions(
-      buttons
-    );
-
-
-    /*
-      모바일 sticky hover/focus 방지
-    */
+    disableButtons(buttons);
 
     clickedButton.blur();
-
 
     updatePracticeProgress();
 
@@ -1485,11 +1544,9 @@ function handlePracticeAnswer(
     practiceFeedbackTimer =
       setTimeout(
         () => {
-
           showNextPracticeQuestion(
             app
           );
-
         },
         CORRECT_FEEDBACK_MS
       );
@@ -1499,10 +1556,6 @@ function handlePracticeAnswer(
   }
 
 
-  /*
-    Wrong
-  */
-
   practiceState.wrongCount++;
 
 
@@ -1511,35 +1564,26 @@ function handlePracticeAnswer(
   );
 
 
-  /*
-    정답 찾기
-  */
+  const correctText =
+    practiceState.currentType ===
+    "ENGLISH_TO_KOREAN"
 
-  const correctButton =
-    buttons.find(button => {
+      ? practiceState.currentRow
+          .korean.trim()
 
-      if (
-        practiceState.currentType ===
-        "ENGLISH_TO_KOREAN"
-      ) {
-
-        return (
-          button.textContent.trim() ===
-          practiceState.currentRow
-            .korean.trim()
-        );
-      }
-
-
-      return (
-        button.textContent.trim() ===
-        cleanEnglish(
+      : cleanEnglish(
           practiceState
             .currentRow
             .english
-        )
-      );
-    });
+        );
+
+
+  const correctButton =
+    buttons.find(
+      button =>
+        button.textContent.trim() ===
+        correctText
+    );
 
 
   if (correctButton) {
@@ -1550,38 +1594,26 @@ function handlePracticeAnswer(
   }
 
 
-  /*
-    다음 round에는
-    이번 round에서 틀린 문장만 재출제
-  */
-
   practiceState.retryQueue.push(
     practiceState.currentRow
   );
 
 
-  showPracticeFeedback(
-    "Not quite. You'll see this sentence again."
+  showFeedback(
+    feedback,
+    "Not quite.",
+    "wrong"
   );
 
 
   playSound("wrong");
 
-
-  disablePracticeOptions(
-    buttons
-  );
-
+  disableButtons(buttons);
 
   clickedButton.blur();
 
-
   updatePracticeProgress();
 
-
-  /*
-    오답일 경우 정답을 2.5초간 보여줌
-  */
 
   practiceFeedbackTimer =
     setTimeout(
@@ -1590,7 +1622,6 @@ function handlePracticeAnswer(
         showNextPracticeQuestion(
           app
         );
-
       },
       WRONG_FEEDBACK_MS
     );
@@ -1598,65 +1629,17 @@ function handlePracticeAnswer(
 
 
 /* =========================================================
-   DISABLE OPTIONS
-   ========================================================= */
-
-function disablePracticeOptions(
-  buttons
-) {
-
-  buttons.forEach(button => {
-
-    button.disabled = true;
-
-  });
-}
-
-
-/* =========================================================
-   PRACTICE FEEDBACK
-   ========================================================= */
-
-function showPracticeFeedback(
-  message
-) {
-
-  const feedback =
-    document.getElementById(
-      "practiceFeedback"
-    );
-
-
-  if (!feedback) {
-    return;
-  }
-
-
-  feedback.textContent =
-    message;
-}
-
-
-/* =========================================================
    PRACTICE ROUND END
    ========================================================= */
 
-function handlePracticeRoundEnd(
-  app
-) {
+function handlePracticeRoundEnd(app) {
 
-  if (!practiceState) {
-    return;
-  }
+  if (!practiceState) return;
 
 
   const missedRows =
     practiceState.retryQueue;
 
-
-  /*
-    모두 맞음
-  */
 
   if (
     missedRows.length === 0
@@ -1668,10 +1651,6 @@ function handlePracticeRoundEnd(
   }
 
 
-  /*
-    Round 3까지 완료
-  */
-
   if (
     practiceState.round >=
     MAX_PRACTICE_ROUNDS
@@ -1682,12 +1661,6 @@ function handlePracticeRoundEnd(
     return;
   }
 
-
-  /*
-    다음 Round:
-
-    직전 Round의 오답 문장만
-  */
 
   practiceState.round++;
 
@@ -1719,9 +1692,7 @@ function handlePracticeRoundEnd(
 
 function updatePracticeProgress() {
 
-  if (!practiceState) {
-    return;
-  }
+  if (!practiceState) return;
 
 
   const roundText =
@@ -1734,21 +1705,23 @@ function updatePracticeProgress() {
       "practiceCountText"
     );
 
-
   const fill =
     document.getElementById(
       "practiceProgressFill"
     );
 
 
-  if (!roundText || !countText || !fill) {
+  if (
+    !roundText ||
+    !countText ||
+    !fill
+  ) {
     return;
   }
 
 
   const completed =
     practiceState.roundAnswered;
-
 
   const total =
     practiceState.roundTotal;
@@ -1757,7 +1730,9 @@ function updatePracticeProgress() {
   const percent =
     total > 0
       ? Math.min(
-          (completed / total) * 100,
+          completed /
+          total *
+          100,
           100
         )
       : 0;
@@ -1765,6 +1740,7 @@ function updatePracticeProgress() {
 
   roundText.textContent =
     `Round ${practiceState.round}`;
+
 
   countText.textContent =
     `${completed} / ${total}`;
@@ -1779,27 +1755,22 @@ function updatePracticeProgress() {
    PRACTICE RESULT
    ========================================================= */
 
-function renderPracticeResult(
-  app
-) {
+function renderPracticeResult(app) {
 
   clearPracticeTimers();
 
 
   const unresolved =
     practiceState
-      ? practiceState.retryQueue.length
+      ? practiceState
+          .retryQueue
+          .length
       : 0;
 
 
   const allMastered =
     unresolved === 0;
 
-
-  /*
-    Round 3 이전에 전부 맞았거나
-    Round 3 종료 후 완료 화면
-  */
 
   playSound("victory");
 
@@ -1817,9 +1788,7 @@ function renderPracticeResult(
           }
         </h1>
 
-
         <p class="result-message">
-
           ${
             allMastered
 
@@ -1833,39 +1802,25 @@ function renderPracticeResult(
                  }
                  and try again.`
           }
-
         </p>
-
 
         <div class="result-stats">
 
           <div>
-
             <strong>
               ${practiceState.correctCount}
             </strong>
-
-            <span>
-              Correct
-            </span>
-
+            <span>Correct</span>
           </div>
 
-
           <div>
-
             <strong>
               ${practiceState.wrongCount}
             </strong>
-
-            <span>
-              Wrong
-            </span>
-
+            <span>Wrong</span>
           </div>
 
         </div>
-
 
         <div class="result-buttons">
 
@@ -1875,7 +1830,6 @@ function renderPracticeResult(
           >
             🔄 Practice Again
           </button>
-
 
           <button
             type="button"
@@ -1904,7 +1858,6 @@ function renderPracticeResult(
           app,
           currentLesson
         );
-
       }
     );
 
@@ -1915,11 +1868,7 @@ function renderPracticeResult(
     )
     .addEventListener(
       "click",
-      () => {
-
-        goBackToLessonMenu();
-
-      }
+      goBackToLessonMenu
     );
 }
 
@@ -1952,53 +1901,788 @@ function clearPracticeTimers() {
 
 
 /* =========================================================
-   TEST PLACEHOLDER
+   =========================================================
+   READING TEST
+   =========================================================
    ========================================================= */
 
-/*
-  Test는 아직 구현 전.
 
-  다만:
-  - #test URL 분리
-  - browser back
-  - 공용 sound system
+/* =========================================================
+   TEST START SCREEN
+   ========================================================= */
 
-  은 이미 준비되어 있음.
-*/
-
-
-function renderTestPlaceholder(
+function renderTestStart(
   app,
   lesson
 ) {
 
-  practiceState = null;
+  testState = null;
 
 
   app.innerHTML = `
-    <section class="lesson-menu">
+    <section class="test-start">
 
-      <h1 class="lesson-heading">
-        Lesson ${lesson.lessonNumber}. Reading Test
-      </h1>
-
-      <div class="reading-title">
-        &lt;${lesson.title}&gt;
-      </div>
-
-      <p>
-        Reading Test is coming next.
-      </p>
-
-      <div class="lesson-buttons">
+      <div class="test-start-card">
 
         <button
           type="button"
-          class="practice-button"
+          class="back-button"
+          id="testStartBackButton"
+        >
+          ← Lesson Menu
+        </button>
+
+        <h1>
+          📝 Reading Test
+        </h1>
+
+        <div class="reading-title">
+          &lt;${lesson.title}&gt;
+        </div>
+
+        <div class="test-instructions">
+
+          <strong>
+            20 Questions
+          </strong>
+
+          <p>
+            10 seconds per question
+          </p>
+
+          <p>
+            Answer as quickly and accurately as you can.
+          </p>
+
+        </div>
+
+        <button
+          type="button"
+          class="test-start-button"
+          id="testStartButton"
+        >
+          Start Test
+        </button>
+
+      </div>
+
+    </section>
+  `;
+
+
+  document
+    .getElementById(
+      "testStartBackButton"
+    )
+    .addEventListener(
+      "click",
+      goBackToLessonMenu
+    );
+
+
+  document
+    .getElementById(
+      "testStartButton"
+    )
+    .addEventListener(
+      "click",
+      () => {
+
+        startReadingTest(
+          app,
+          lesson
+        );
+      }
+    );
+}
+
+
+/* =========================================================
+   TEST START
+   ========================================================= */
+
+function startReadingTest(
+  app,
+  lesson
+) {
+
+  clearTestTimers();
+
+
+  const questions =
+    buildTestQuestions(
+      lesson
+    );
+
+
+  if (
+    questions.length <
+    TEST_QUESTION_COUNT
+  ) {
+
+    renderError(
+      app,
+      new Error(
+        `Reading Test 문항을 ${TEST_QUESTION_COUNT}개 만들 수 없습니다. 현재 ${questions.length}개입니다.`
+      )
+    );
+
+    return;
+  }
+
+
+  testState = {
+
+    questions,
+
+    currentIndex: 0,
+
+    score: 0,
+
+    locked: false,
+
+    reviewSentences: [],
+
+    currentReveal:
+      null
+  };
+
+
+  renderTestScreen(app);
+
+  showNextTestQuestion(app);
+}
+
+
+/* =========================================================
+   TEST QUESTION BANK
+   ========================================================= */
+
+function buildTestQuestions(lesson) {
+
+  const banks = {
+
+    RANDOM_BLANK:
+      buildRandomBlankBank(
+        lesson
+      ),
+
+    SENTENCE_ORDERING:
+      buildSentenceOrderingBank(
+        lesson
+      ),
+
+    FIND_ERROR:
+      buildFindErrorBank(
+        lesson
+      ),
+
+    TEXT_SEQUENCE:
+      buildTextSequenceBank(
+        lesson
+      ),
+
+    MISSING_PHRASE:
+      buildMissingPhraseBank(
+        lesson
+      )
+  };
+
+
+  const targetPerType = 4;
+
+  const selected = [];
+
+  const usedIds =
+    new Set();
+
+  const usedQuestionKeys =
+    new Set();
+
+
+  /*
+    우선 5유형 × 4문항을 목표로 함.
+  */
+
+  const typeOrder = [
+    "FIND_ERROR",
+    "TEXT_SEQUENCE",
+    "MISSING_PHRASE",
+    "SENTENCE_ORDERING",
+    "RANDOM_BLANK"
+  ];
+
+
+  for (
+    const type
+    of typeOrder
+  ) {
+
+    for (
+      let i = 0;
+      i < targetPerType;
+      i++
+    ) {
+
+      const candidate =
+        chooseTestCandidate(
+          banks[type],
+          usedIds,
+          usedQuestionKeys
+        );
+
+
+      if (!candidate) {
+        break;
+      }
+
+
+      selected.push(
+        candidate
+      );
+
+
+      usedQuestionKeys.add(
+        candidate.key
+      );
+
+
+      candidate.ids.forEach(
+        id =>
+          usedIds.add(id)
+      );
+    }
+  }
+
+
+  /*
+    어떤 유형에서 4개를 확보하지 못한 경우
+    다른 유형에서 채움.
+  */
+
+  while (
+    selected.length <
+    TEST_QUESTION_COUNT
+  ) {
+
+    let added = false;
+
+
+    for (
+      const type
+      of typeOrder
+    ) {
+
+      const candidate =
+        chooseTestCandidate(
+          banks[type],
+          usedIds,
+          usedQuestionKeys
+        );
+
+
+      if (!candidate) {
+        continue;
+      }
+
+
+      selected.push(
+        candidate
+      );
+
+
+      usedQuestionKeys.add(
+        candidate.key
+      );
+
+
+      candidate.ids.forEach(
+        id =>
+          usedIds.add(id)
+      );
+
+
+      added = true;
+
+
+      if (
+        selected.length >=
+        TEST_QUESTION_COUNT
+      ) {
+        break;
+      }
+    }
+
+
+    if (!added) {
+
+      /*
+        문장 중복을 완전히 피할 수 없는 경우,
+        아직 사용하지 않은 문제 자체는 허용.
+      */
+
+      for (
+        const type
+        of typeOrder
+      ) {
+
+        const remaining =
+          banks[type].filter(
+            item =>
+              !usedQuestionKeys.has(
+                item.key
+              )
+          );
+
+
+        if (!remaining.length) {
+          continue;
+        }
+
+
+        const candidate =
+          randomChoice(
+            remaining
+          );
+
+
+        selected.push(
+          candidate
+        );
+
+
+        usedQuestionKeys.add(
+          candidate.key
+        );
+
+
+        added = true;
+
+
+        if (
+          selected.length >=
+          TEST_QUESTION_COUNT
+        ) {
+          break;
+        }
+      }
+    }
+
+
+    if (!added) {
+      break;
+    }
+  }
+
+
+  return shuffleArray(
+    selected.slice(
+      0,
+      TEST_QUESTION_COUNT
+    )
+  );
+}
+
+
+/* =========================================================
+   TEST CANDIDATE SELECTION
+   ========================================================= */
+
+function chooseTestCandidate(
+  bank,
+  usedIds,
+  usedKeys
+) {
+
+  const available =
+    bank.filter(
+      item =>
+        !usedKeys.has(
+          item.key
+        )
+    );
+
+
+  if (!available.length) {
+    return null;
+  }
+
+
+  const fresh =
+    available.filter(
+      item =>
+        item.ids.every(
+          id =>
+            !usedIds.has(id)
+        )
+    );
+
+
+  if (fresh.length) {
+
+    return randomChoice(
+      fresh
+    );
+  }
+
+
+  /*
+    동일 문장 반복을 완전히
+    피할 수 없는 경우 허용
+  */
+
+  return randomChoice(
+    available
+  );
+}
+
+
+/* =========================================================
+   RANDOM BLANK BANK
+   ========================================================= */
+
+function buildRandomBlankBank(
+  lesson
+) {
+
+  return lesson.sentences
+    .filter(row => {
+
+      return (
+        getBlankCandidates(
+          row.english
+        ).length > 0 &&
+        row.korean.trim()
+      );
+    })
+    .map(row => ({
+      type:
+        "RANDOM_BLANK",
+
+      key:
+        `blank-${row.id}`,
+
+      ids:
+        [row.id],
+
+      row
+    }));
+}
+
+
+/* =========================================================
+   SENTENCE ORDERING BANK
+   ========================================================= */
+
+function buildSentenceOrderingBank(
+  lesson
+) {
+
+  return lesson.sentences
+    .filter(row => {
+
+      const chunks =
+        getChunks(
+          row.english
+        );
+
+
+      return (
+        chunks.length >= 2 &&
+        row.korean.trim()
+      );
+    })
+    .map(row => ({
+      type:
+        "SENTENCE_ORDERING",
+
+      key:
+        `ordering-${row.id}`,
+
+      ids:
+        [row.id],
+
+      row
+    }));
+}
+
+
+/* =========================================================
+   FIND ERROR BANK
+   ========================================================= */
+
+function buildFindErrorBank(
+  lesson
+) {
+
+  return lesson.sentences
+    .filter(row => {
+
+      const spans =
+        extractErrorSpans(
+          row.english
+        );
+
+      const choices =
+        splitSemicolon(
+          row.error_choices
+        );
+
+
+      return (
+        spans.length === 4 &&
+        choices.length === 4
+      );
+    })
+    .map(row => ({
+      type:
+        "FIND_ERROR",
+
+      key:
+        `error-${row.id}`,
+
+      ids:
+        [row.id],
+
+      row
+    }));
+}
+
+
+/* =========================================================
+   MISSING PHRASE BANK
+   ========================================================= */
+
+function buildMissingPhraseBank(
+  lesson
+) {
+
+  return lesson.sentences
+    .filter(row => {
+
+      return Boolean(
+        parsePhraseData(row)
+      );
+    })
+    .map(row => ({
+      type:
+        "MISSING_PHRASE",
+
+      key:
+        `phrase-${row.id}`,
+
+      ids:
+        [row.id],
+
+      row
+    }));
+}
+
+
+/* =========================================================
+   TEXT SEQUENCE BANK
+   ========================================================= */
+
+function buildTextSequenceBank(
+  lesson
+) {
+
+  const groups =
+    new Map();
+
+
+  lesson.sentences.forEach(
+    row => {
+
+      const paragraphKey =
+        row.id.slice(0, 5);
+
+
+      if (
+        !groups.has(
+          paragraphKey
+        )
+      ) {
+
+        groups.set(
+          paragraphKey,
+          []
+        );
+      }
+
+
+      groups
+        .get(paragraphKey)
+        .push(row);
+    }
+  );
+
+
+  const windows = [];
+
+
+  groups.forEach(
+    (
+      rows,
+      paragraphKey
+    ) => {
+
+      const sorted =
+        [...rows].sort(
+          (a, b) =>
+            Number(
+              a.id.slice(-2)
+            ) -
+            Number(
+              b.id.slice(-2)
+            )
+        );
+
+
+      for (
+        let i = 0;
+        i <=
+        sorted.length - 4;
+        i++
+      ) {
+
+        const group =
+          sorted.slice(
+            i,
+            i + 4
+          );
+
+
+        const numbers =
+          group.map(
+            row =>
+              Number(
+                row.id.slice(-2)
+              )
+          );
+
+
+        const consecutive =
+          numbers.every(
+            (
+              number,
+              index
+            ) => {
+
+              if (index === 0) {
+                return true;
+              }
+
+              return (
+                number ===
+                numbers[0] +
+                index
+              );
+            }
+          );
+
+
+        if (!consecutive) {
+          continue;
+        }
+
+
+        windows.push({
+          type:
+            "TEXT_SEQUENCE",
+
+          key:
+            `sequence-${group
+              .map(row => row.id)
+              .join("-")}`,
+
+          ids:
+            group.map(
+              row => row.id
+            ),
+
+          rows:
+            group,
+
+          paragraphKey
+        });
+      }
+    }
+  );
+
+
+  return windows;
+}
+
+
+/* =========================================================
+   TEST SCREEN
+   ========================================================= */
+
+function renderTestScreen(app) {
+
+  app.innerHTML = `
+    <section class="test-screen">
+
+      <div class="test-topbar">
+
+        <button
+          type="button"
+          class="back-button"
           id="testBackButton"
         >
           ← Lesson Menu
         </button>
+
+        <div class="test-progress-wrap">
+
+          <div class="test-progress-text">
+            <span>
+              Reading Test
+            </span>
+
+            <span
+              id="testQuestionNumber"
+            ></span>
+          </div>
+
+          <div class="test-time-bar">
+            <div
+              class="test-time-fill"
+              id="testTimeFill"
+            ></div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="test-card">
+
+        <div
+          class="test-type-label"
+          id="testTypeLabel"
+        ></div>
+
+        <div
+          class="test-korean"
+          id="testKorean"
+        ></div>
+
+        <div
+          class="test-question"
+          id="testQuestion"
+        ></div>
+
+        <div
+          class="test-answer-area"
+          id="testAnswerArea"
+        ></div>
+
+        <div
+          class="test-feedback"
+          id="testFeedback"
+        ></div>
 
       </div>
 
@@ -2012,17 +2696,2536 @@ function renderTestPlaceholder(
     )
     .addEventListener(
       "click",
-      () => {
-
-        goBackToLessonMenu();
-
-      }
+      goBackToLessonMenu
     );
 }
 
 
 /* =========================================================
-   STATUS
+   NEXT TEST QUESTION
+   ========================================================= */
+
+function showNextTestQuestion(app) {
+
+  if (!testState) return;
+
+
+  clearTestTimers();
+
+
+  if (
+    testState.currentIndex >=
+    testState.questions.length
+  ) {
+
+    renderTestResult(app);
+
+    return;
+  }
+
+
+  testState.locked =
+    false;
+
+  testState.currentReveal =
+    null;
+
+
+  const question =
+    testState.questions[
+      testState.currentIndex
+    ];
+
+
+  updateTestQuestionNumber();
+
+
+  clearTestQuestionArea();
+
+
+  switch (question.type) {
+
+    case "RANDOM_BLANK":
+
+      renderRandomBlankTest(
+        app,
+        question
+      );
+
+      break;
+
+
+    case "SENTENCE_ORDERING":
+
+      renderSentenceOrderingTest(
+        app,
+        question
+      );
+
+      break;
+
+
+    case "FIND_ERROR":
+
+      renderFindErrorTest(
+        app,
+        question
+      );
+
+      break;
+
+
+    case "TEXT_SEQUENCE":
+
+      renderTextSequenceTest(
+        app,
+        question
+      );
+
+      break;
+
+
+    case "MISSING_PHRASE":
+
+      renderMissingPhraseTest(
+        app,
+        question
+      );
+
+      break;
+  }
+
+
+  startTestTimer(app);
+}
+
+
+/* =========================================================
+   TEST HEADER
+   ========================================================= */
+
+function updateTestQuestionNumber() {
+
+  const element =
+    document.getElementById(
+      "testQuestionNumber"
+    );
+
+
+  if (!element) return;
+
+
+  element.textContent =
+    `${testState.currentIndex + 1} / ${testState.questions.length}`;
+}
+
+
+/* =========================================================
+   CLEAR TEST QUESTION
+   ========================================================= */
+
+function clearTestQuestionArea() {
+
+  const label =
+    document.getElementById(
+      "testTypeLabel"
+    );
+
+  const korean =
+    document.getElementById(
+      "testKorean"
+    );
+
+  const question =
+    document.getElementById(
+      "testQuestion"
+    );
+
+  const answer =
+    document.getElementById(
+      "testAnswerArea"
+    );
+
+  const feedback =
+    document.getElementById(
+      "testFeedback"
+    );
+
+
+  label.textContent = "";
+  korean.textContent = "";
+  question.innerHTML = "";
+  answer.innerHTML = "";
+  feedback.textContent = "";
+  feedback.style.color = "";
+}
+
+
+/* =========================================================
+   TEST TIMER
+   ========================================================= */
+
+function startTestTimer(app) {
+
+  const fill =
+    document.getElementById(
+      "testTimeFill"
+    );
+
+
+  if (!fill) return;
+
+
+  fill.style.width =
+    "100%";
+
+
+  const start =
+    performance.now();
+
+
+  function animate(now) {
+
+    if (
+      !testState ||
+      testState.locked
+    ) {
+      return;
+    }
+
+
+    const elapsed =
+      now - start;
+
+
+    const remaining =
+      Math.max(
+        0,
+        1 -
+        elapsed /
+        TEST_TIME_LIMIT_MS
+      );
+
+
+    fill.style.width =
+      `${remaining * 100}%`;
+
+
+    if (remaining > 0) {
+
+      testAnimationFrame =
+        requestAnimationFrame(
+          animate
+        );
+    }
+  }
+
+
+  testAnimationFrame =
+    requestAnimationFrame(
+      animate
+    );
+
+
+  testTimeoutTimer =
+    setTimeout(
+      () => {
+
+        handleTestTimeout(app);
+
+      },
+      TEST_TIME_LIMIT_MS
+    );
+}
+
+
+/* =========================================================
+   CLEAR TEST TIMERS
+   ========================================================= */
+
+function clearTestTimers() {
+
+  if (testFeedbackTimer) {
+
+    clearTimeout(
+      testFeedbackTimer
+    );
+
+    testFeedbackTimer = null;
+  }
+
+
+  if (testTimeoutTimer) {
+
+    clearTimeout(
+      testTimeoutTimer
+    );
+
+    testTimeoutTimer = null;
+  }
+
+
+  if (testAnimationFrame) {
+
+    cancelAnimationFrame(
+      testAnimationFrame
+    );
+
+    testAnimationFrame = null;
+  }
+}
+
+
+/* =========================================================
+   TEST ANSWER COMMON
+   ========================================================= */
+
+function submitTestAnswer(
+  app,
+  isCorrect,
+  reveal
+) {
+
+  if (
+    !testState ||
+    testState.locked
+  ) {
+    return;
+  }
+
+
+  testState.locked = true;
+
+
+  clearTestTimers();
+
+
+  if (typeof reveal === "function") {
+
+    reveal(
+      isCorrect
+        ? "correct"
+        : "wrong"
+    );
+  }
+
+
+  const feedback =
+    document.getElementById(
+      "testFeedback"
+    );
+
+
+  if (isCorrect) {
+
+    testState.score++;
+
+
+    showFeedback(
+      feedback,
+      "Correct!",
+      "correct"
+    );
+
+
+    playSound("correct");
+
+
+    testFeedbackTimer =
+      setTimeout(
+        () => {
+
+          advanceTestQuestion(app);
+
+        },
+        CORRECT_FEEDBACK_MS
+      );
+
+  } else {
+
+    addCurrentQuestionToReview();
+
+
+    showFeedback(
+      feedback,
+      "Not quite.",
+      "wrong"
+    );
+
+
+    playSound("wrong");
+
+
+    testFeedbackTimer =
+      setTimeout(
+        () => {
+
+          advanceTestQuestion(app);
+
+        },
+        WRONG_FEEDBACK_MS
+      );
+  }
+}
+
+
+/* =========================================================
+   TEST TIMEOUT
+   ========================================================= */
+
+function handleTestTimeout(app) {
+
+  if (
+    !testState ||
+    testState.locked
+  ) {
+    return;
+  }
+
+
+  testState.locked = true;
+
+
+  clearTestTimers();
+
+
+  if (
+    typeof
+    testState.currentReveal ===
+    "function"
+  ) {
+
+    testState.currentReveal(
+      "timeout"
+    );
+  }
+
+
+  addCurrentQuestionToReview();
+
+
+  const feedback =
+    document.getElementById(
+      "testFeedback"
+    );
+
+
+  showFeedback(
+    feedback,
+    "Time's up!",
+    "wrong"
+  );
+
+
+  playSound("wrong");
+
+
+  testFeedbackTimer =
+    setTimeout(
+      () => {
+
+        advanceTestQuestion(app);
+
+      },
+      WRONG_FEEDBACK_MS
+    );
+}
+
+
+/* =========================================================
+   ADVANCE TEST
+   ========================================================= */
+
+function advanceTestQuestion(app) {
+
+  if (!testState) return;
+
+
+  testState.currentIndex++;
+
+
+  showNextTestQuestion(app);
+}
+
+
+/* =========================================================
+   REVIEW SENTENCES
+   ========================================================= */
+
+function addCurrentQuestionToReview() {
+
+  const item =
+    testState.questions[
+      testState.currentIndex
+    ];
+
+
+  if (!item) return;
+
+
+  if (
+    item.type ===
+    "TEXT_SEQUENCE"
+  ) {
+
+    item.rows.forEach(
+      row =>
+        addReviewSentence(
+          cleanEnglish(
+            row.english
+          )
+        )
+    );
+
+    return;
+  }
+
+
+  if (item.row) {
+
+    addReviewSentence(
+      cleanEnglish(
+        item.row.english
+      )
+    );
+  }
+}
+
+
+function addReviewSentence(sentence) {
+
+  if (!sentence) return;
+
+
+  if (
+    testState.reviewSentences
+      .includes(sentence)
+  ) {
+    return;
+  }
+
+
+  testState.reviewSentences.push(
+    sentence
+  );
+}
+
+
+/* =========================================================
+   =========================================================
+   TEST TYPE 1
+   RANDOM BLANK
+   =========================================================
+   ========================================================= */
+
+function getBlankCandidates(raw) {
+
+  const excludedRanges = [];
+
+  const exclusionRegex =
+    /\*\*(.*?)\*\*/g;
+
+
+  let exclusionMatch;
+
+
+  while (
+    (
+      exclusionMatch =
+        exclusionRegex.exec(raw)
+    ) !== null
+  ) {
+
+    excludedRanges.push({
+      start:
+        exclusionMatch.index,
+
+      end:
+        exclusionMatch.index +
+        exclusionMatch[0].length
+    });
+  }
+
+
+  const candidates = [];
+
+  const wordRegex =
+    /[A-Za-z]{4,}/g;
+
+
+  let match;
+
+
+  while (
+    (
+      match =
+        wordRegex.exec(raw)
+    ) !== null
+  ) {
+
+    const start =
+      match.index;
+
+    const insideExcluded =
+      excludedRanges.some(
+        range =>
+          start >= range.start &&
+          start < range.end
+      );
+
+
+    if (insideExcluded) {
+      continue;
+    }
+
+
+    candidates.push({
+      word:
+        match[0],
+
+      start:
+        match.index,
+
+      end:
+        match.index +
+        match[0].length
+    });
+  }
+
+
+  return candidates;
+}
+
+
+function renderRandomBlankTest(
+  app,
+  item
+) {
+
+  const row =
+    item.row;
+
+
+  const candidates =
+    getBlankCandidates(
+      row.english
+    );
+
+
+  const target =
+    randomChoice(
+      candidates
+    );
+
+
+  const rawWithBlank =
+    row.english.slice(
+      0,
+      target.start
+    ) +
+    "_____" +
+    row.english.slice(
+      target.end
+    );
+
+
+  document
+    .getElementById(
+      "testTypeLabel"
+    )
+    .textContent =
+      "Random Blank";
+
+
+  document
+    .getElementById(
+      "testKorean"
+    )
+    .textContent =
+      row.korean.trim();
+
+
+  document
+    .getElementById(
+      "testQuestion"
+    )
+    .textContent =
+      cleanEnglish(
+        rawWithBlank
+      );
+
+
+  const area =
+    document.getElementById(
+      "testAnswerArea"
+    );
+
+
+  area.innerHTML = `
+    <form
+      class="blank-form"
+      id="blankForm"
+    >
+
+      <input
+        type="text"
+        class="blank-input"
+        id="blankInput"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder="Type the missing word"
+      >
+
+      <button
+        type="submit"
+        class="test-submit-button"
+      >
+        Answer
+      </button>
+
+    </form>
+
+    <div
+      class="test-correct-answer"
+      id="blankCorrectAnswer"
+    ></div>
+  `;
+
+
+  const input =
+    document.getElementById(
+      "blankInput"
+    );
+
+
+  const form =
+    document.getElementById(
+      "blankForm"
+    );
+
+
+  const correctAnswer =
+    document.getElementById(
+      "blankCorrectAnswer"
+    );
+
+
+  function reveal() {
+
+    input.disabled = true;
+
+
+    correctAnswer.textContent =
+      `Answer: ${target.word}`;
+  }
+
+
+  testState.currentReveal =
+    reveal;
+
+
+  form.addEventListener(
+    "submit",
+    event => {
+
+      event.preventDefault();
+
+
+      if (
+        testState.locked
+      ) {
+        return;
+      }
+
+
+      const answer =
+        input.value
+          .trim()
+          .toLowerCase();
+
+
+      if (!answer) {
+        return;
+      }
+
+
+      const isCorrect =
+        answer ===
+        target.word
+          .toLowerCase();
+
+
+      submitTestAnswer(
+        app,
+        isCorrect,
+        reveal
+      );
+    }
+  );
+
+
+  setTimeout(
+    () => {
+      input.focus();
+    },
+    0
+  );
+}
+
+
+/* =========================================================
+   =========================================================
+   TEST TYPE 2
+   SENTENCE ORDERING
+   =========================================================
+   ========================================================= */
+
+function getChunks(raw) {
+
+  return raw
+    .split(" / ")
+    .map(
+      chunk =>
+        cleanEnglish(chunk)
+    )
+    .filter(Boolean);
+}
+
+
+function renderSentenceOrderingTest(
+  app,
+  item
+) {
+
+  const row =
+    item.row;
+
+
+  const chunks =
+    getChunks(
+      row.english
+    );
+
+
+  const shuffled =
+    shuffleArray(
+      chunks.map(
+        (
+          text,
+          index
+        ) => ({
+          text,
+          originalIndex:
+            index
+        })
+      )
+    );
+
+
+  let selected = [];
+
+
+  document
+    .getElementById(
+      "testTypeLabel"
+    )
+    .textContent =
+      "Sentence Ordering";
+
+
+  document
+    .getElementById(
+      "testKorean"
+    )
+    .textContent =
+      row.korean.trim();
+
+
+  document
+    .getElementById(
+      "testQuestion"
+    )
+    .textContent =
+      "Put the chunks in the correct order.";
+
+
+  const area =
+    document.getElementById(
+      "testAnswerArea"
+    );
+
+
+  area.innerHTML = `
+    <div
+      class="ordering-selected"
+      id="orderingSelected"
+    ></div>
+
+    <div
+      class="ordering-options"
+      id="orderingOptions"
+    ></div>
+
+    <div
+      class="test-correct-answer"
+      id="orderingCorrectAnswer"
+    ></div>
+  `;
+
+
+  const selectedArea =
+    document.getElementById(
+      "orderingSelected"
+    );
+
+  const optionsArea =
+    document.getElementById(
+      "orderingOptions"
+    );
+
+  const correctAnswer =
+    document.getElementById(
+      "orderingCorrectAnswer"
+    );
+
+
+  function render() {
+
+    selectedArea.innerHTML = "";
+    optionsArea.innerHTML = "";
+
+
+    selected.forEach(
+      (
+        item,
+        index
+      ) => {
+
+        const button =
+          document.createElement(
+            "button"
+          );
+
+
+        button.type =
+          "button";
+
+        button.className =
+          "ordering-selected-item";
+
+
+        button.textContent =
+          `${index + 1}. ${item.text}`;
+
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            if (
+              testState.locked
+            ) {
+              return;
+            }
+
+
+            selected =
+              selected.slice(
+                0,
+                index
+              );
+
+
+            render();
+          }
+        );
+
+
+        selectedArea.appendChild(
+          button
+        );
+      }
+    );
+
+
+    shuffled.forEach(
+      chunk => {
+
+        const alreadySelected =
+          selected.includes(
+            chunk
+          );
+
+
+        const button =
+          document.createElement(
+            "button"
+          );
+
+
+        button.type =
+          "button";
+
+        button.className =
+          "test-option";
+
+
+        button.textContent =
+          chunk.text;
+
+
+        button.disabled =
+          alreadySelected ||
+          testState.locked;
+
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            if (
+              testState.locked
+            ) {
+              return;
+            }
+
+
+            selected.push(
+              chunk
+            );
+
+
+            render();
+
+
+            if (
+              selected.length ===
+              chunks.length
+            ) {
+
+              const isCorrect =
+                selected.every(
+                  (
+                    chosen,
+                    index
+                  ) =>
+                    chosen.originalIndex ===
+                    index
+                );
+
+
+              submitTestAnswer(
+                app,
+                isCorrect,
+                reveal
+              );
+            }
+          }
+        );
+
+
+        optionsArea.appendChild(
+          button
+        );
+      }
+    );
+  }
+
+
+  function reveal() {
+
+    correctAnswer.textContent =
+      `Answer: ${chunks.join(" ")}`;
+
+
+    [
+      ...optionsArea
+        .querySelectorAll(
+          "button"
+        ),
+      ...selectedArea
+        .querySelectorAll(
+          "button"
+        )
+    ].forEach(
+      button => {
+        button.disabled = true;
+      }
+    );
+  }
+
+
+  testState.currentReveal =
+    reveal;
+
+
+  render();
+}
+
+
+/* =========================================================
+   =========================================================
+   TEST TYPE 3
+   FIND THE ERROR
+   =========================================================
+   ========================================================= */
+
+function extractErrorSpans(raw) {
+
+  const matches = [];
+
+  const regex =
+    /\{([^{}]+)\}/g;
+
+
+  let match;
+
+
+  while (
+    (
+      match =
+        regex.exec(raw)
+    ) !== null
+  ) {
+
+    matches.push(
+      match[1]
+    );
+  }
+
+
+  return matches;
+}
+
+
+function renderFindErrorTest(
+  app,
+  item
+) {
+
+  const row =
+    item.row;
+
+
+  const wrongChoices =
+    splitSemicolon(
+      row.error_choices
+    );
+
+
+  const wrongIndex =
+    Math.floor(
+      Math.random() * 4
+    );
+
+
+  document
+    .getElementById(
+      "testTypeLabel"
+    )
+    .textContent =
+      "Find the Error";
+
+
+  document
+    .getElementById(
+      "testKorean"
+    )
+    .textContent =
+      row.korean.trim();
+
+
+  const questionArea =
+    document.getElementById(
+      "testQuestion"
+    );
+
+
+  document
+    .getElementById(
+      "testAnswerArea"
+    )
+    .innerHTML = `
+      <div
+        class="test-correct-answer"
+        id="errorCorrectAnswer"
+      ></div>
+    `;
+
+
+  const correctAnswer =
+    document.getElementById(
+      "errorCorrectAnswer"
+    );
+
+
+  const buttons = [];
+
+  let candidateIndex = 0;
+
+  let lastIndex = 0;
+
+
+  const regex =
+    /\{([^{}]+)\}/g;
+
+
+  let match;
+
+
+  while (
+    (
+      match =
+        regex.exec(
+          row.english
+        )
+    ) !== null
+  ) {
+
+    const before =
+      row.english.slice(
+        lastIndex,
+        match.index
+      );
+
+
+    questionArea.appendChild(
+      document.createTextNode(
+        cleanInlineMetadata(
+          before
+        )
+      )
+    );
+
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+
+    button.type =
+      "button";
+
+    button.className =
+      "error-choice";
+
+
+    const correctText =
+      cleanEnglish(
+        match[1]
+      );
+
+
+    const displayText =
+      candidateIndex ===
+      wrongIndex
+
+        ? wrongChoices[
+            candidateIndex
+          ]
+
+        : correctText;
+
+
+    button.textContent =
+      displayText;
+
+
+    const thisIndex =
+      candidateIndex;
+
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        if (
+          testState.locked
+        ) {
+          return;
+        }
+
+
+        const correct =
+          thisIndex ===
+          wrongIndex;
+
+
+        submitTestAnswer(
+          app,
+          correct,
+          mode => {
+
+            revealError(
+              mode,
+              button
+            );
+          }
+        );
+      }
+    );
+
+
+    buttons.push(button);
+
+    questionArea.appendChild(
+      button
+    );
+
+
+    candidateIndex++;
+
+
+    lastIndex =
+      regex.lastIndex;
+  }
+
+
+  questionArea.appendChild(
+    document.createTextNode(
+      cleanInlineMetadata(
+        row.english.slice(
+          lastIndex
+        )
+      )
+    )
+  );
+
+
+  function revealError(
+    mode,
+    selectedButton = null
+  ) {
+
+    buttons.forEach(
+      (
+        button,
+        index
+      ) => {
+
+        button.disabled = true;
+
+
+        if (
+          index ===
+          wrongIndex
+        ) {
+
+          button.classList.add(
+            "wrong"
+          );
+        }
+      }
+    );
+
+
+    if (
+      mode === "wrong" &&
+      selectedButton
+    ) {
+
+      selectedButton.classList.add(
+        "selected-wrong"
+      );
+    }
+
+
+    correctAnswer.textContent =
+      `Correct: ${extractErrorSpans(row.english)[wrongIndex]}`;
+  }
+
+
+  testState.currentReveal =
+    mode =>
+      revealError(mode);
+}
+
+
+/* =========================================================
+   =========================================================
+   TEST TYPE 4
+   TEXT SEQUENCE
+   =========================================================
+   ========================================================= */
+
+function renderTextSequenceTest(
+  app,
+  item
+) {
+
+  const rows =
+    item.rows;
+
+
+  const correctOrder =
+    rows.map(
+      row =>
+        cleanEnglish(
+          row.english
+        )
+    );
+
+
+  const choices =
+    shuffleArray(
+      rows.map(
+        (
+          row,
+          index
+        ) => ({
+          text:
+            cleanEnglish(
+              row.english
+            ),
+
+          originalIndex:
+            index
+        })
+      )
+    );
+
+
+  let selected = [];
+
+
+  document
+    .getElementById(
+      "testTypeLabel"
+    )
+    .textContent =
+      "Text Sequence";
+
+
+  document
+    .getElementById(
+      "testKorean"
+    )
+    .textContent = "";
+
+
+  document
+    .getElementById(
+      "testQuestion"
+    )
+    .textContent =
+      "Put the sentences in the correct order.";
+
+
+  const area =
+    document.getElementById(
+      "testAnswerArea"
+    );
+
+
+  area.innerHTML = `
+    <div
+      class="sequence-options"
+      id="sequenceOptions"
+    ></div>
+
+    <div
+      class="test-correct-answer"
+      id="sequenceCorrectAnswer"
+    ></div>
+  `;
+
+
+  const optionsArea =
+    document.getElementById(
+      "sequenceOptions"
+    );
+
+
+  const correctAnswer =
+    document.getElementById(
+      "sequenceCorrectAnswer"
+    );
+
+
+  function render() {
+
+    optionsArea.innerHTML = "";
+
+
+    choices.forEach(
+      choice => {
+
+        const selectedIndex =
+          selected.indexOf(
+            choice
+          );
+
+
+        const button =
+          document.createElement(
+            "button"
+          );
+
+
+        button.type =
+          "button";
+
+        button.className =
+          "sequence-option";
+
+
+        if (
+          selectedIndex !== -1
+        ) {
+
+          button.classList.add(
+            "selected"
+          );
+
+
+          button.textContent =
+            `${selectedIndex + 1}. ${choice.text}`;
+
+        } else {
+
+          button.textContent =
+            choice.text;
+        }
+
+
+        button.disabled =
+          testState.locked;
+
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            if (
+              testState.locked
+            ) {
+              return;
+            }
+
+
+            const existingIndex =
+              selected.indexOf(
+                choice
+              );
+
+
+            if (
+              existingIndex !== -1
+            ) {
+
+              /*
+                선택된 문장을 다시 클릭하면
+                그 문장부터 이후 번호 취소
+              */
+
+              selected =
+                selected.slice(
+                  0,
+                  existingIndex
+                );
+
+            } else {
+
+              selected.push(
+                choice
+              );
+            }
+
+
+            render();
+
+
+            if (
+              selected.length === 4
+            ) {
+
+              const isCorrect =
+                selected.every(
+                  (
+                    chosen,
+                    index
+                  ) =>
+                    chosen.originalIndex ===
+                    index
+                );
+
+
+              submitTestAnswer(
+                app,
+                isCorrect,
+                reveal
+              );
+            }
+          }
+        );
+
+
+        optionsArea.appendChild(
+          button
+        );
+      }
+    );
+  }
+
+
+  function reveal() {
+
+    optionsArea
+      .querySelectorAll(
+        "button"
+      )
+      .forEach(
+        button => {
+          button.disabled = true;
+        }
+      );
+
+
+    correctAnswer.innerHTML = "";
+
+
+    correctOrder.forEach(
+      (
+        sentence,
+        index
+      ) => {
+
+        const div =
+          document.createElement(
+            "div"
+          );
+
+
+        div.textContent =
+          `${index + 1}. ${sentence}`;
+
+
+        correctAnswer.appendChild(
+          div
+        );
+      }
+    );
+  }
+
+
+  testState.currentReveal =
+    reveal;
+
+
+  render();
+}
+
+
+/* =========================================================
+   =========================================================
+   TEST TYPE 5
+   MISSING PHRASE
+   =========================================================
+   ========================================================= */
+
+function parsePhraseData(row) {
+
+  const raw =
+    row.phrase_distractors.trim();
+
+
+  if (!raw) {
+    return null;
+  }
+
+
+  const leadingMatch =
+    raw.match(/^\/+/);
+
+
+  const trailingMatch =
+    raw.match(/\/+$/);
+
+
+  const leading =
+    leadingMatch
+      ? leadingMatch[0].length
+      : 0;
+
+
+  const trailing =
+    trailingMatch
+      ? trailingMatch[0].length
+      : 0;
+
+
+  const inner =
+    raw
+      .replace(/^\/+/, "")
+      .replace(/\/+$/, "");
+
+
+  const distractors =
+    splitSemicolon(inner);
+
+
+  const chunks =
+    getChunks(
+      row.english
+    );
+
+
+  if (
+    distractors.length < 3
+  ) {
+    return null;
+  }
+
+
+  if (
+    leading +
+    trailing +
+    1 !==
+    chunks.length
+  ) {
+
+    return null;
+  }
+
+
+  const targetIndex =
+    leading;
+
+
+  if (
+    targetIndex < 0 ||
+    targetIndex >=
+    chunks.length
+  ) {
+
+    return null;
+  }
+
+
+  return {
+
+    chunks,
+
+    targetIndex,
+
+    target:
+      chunks[targetIndex],
+
+    distractors
+  };
+}
+
+
+function renderMissingPhraseTest(
+  app,
+  item
+) {
+
+  const row =
+    item.row;
+
+
+  const data =
+    parsePhraseData(row);
+
+
+  const displayChunks =
+    [...data.chunks];
+
+
+  displayChunks[
+    data.targetIndex
+  ] = "_____";
+
+
+  document
+    .getElementById(
+      "testTypeLabel"
+    )
+    .textContent =
+      "Missing Phrase";
+
+
+  document
+    .getElementById(
+      "testKorean"
+    )
+    .textContent = "";
+
+
+  document
+    .getElementById(
+      "testQuestion"
+    )
+    .textContent =
+      displayChunks.join(" ");
+
+
+  const area =
+    document.getElementById(
+      "testAnswerArea"
+    );
+
+
+  area.innerHTML = `
+    <div
+      class="test-options"
+      id="phraseOptions"
+    ></div>
+
+    <div
+      class="test-correct-answer"
+      id="phraseCorrectAnswer"
+    ></div>
+  `;
+
+
+  const optionsArea =
+    document.getElementById(
+      "phraseOptions"
+    );
+
+
+  const correctAnswer =
+    document.getElementById(
+      "phraseCorrectAnswer"
+    );
+
+
+  const distractors =
+    shuffleArray(
+      [...data.distractors]
+    ).slice(
+      0,
+      3
+    );
+
+
+  const options =
+    shuffleArray([
+      {
+        text:
+          data.target,
+
+        correct:
+          true
+      },
+
+      ...distractors.map(
+        text => ({
+          text,
+          correct: false
+        })
+      )
+    ]);
+
+
+  const buttons = [];
+
+
+  options.forEach(
+    option => {
+
+      const button =
+        document.createElement(
+          "button"
+        );
+
+
+      button.type =
+        "button";
+
+      button.className =
+        "test-option";
+
+      button.textContent =
+        option.text;
+
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          if (
+            testState.locked
+          ) {
+            return;
+          }
+
+
+          submitTestAnswer(
+            app,
+            option.correct,
+            mode => {
+
+              revealPhrase(
+                mode,
+                button,
+                option
+              );
+            }
+          );
+        }
+      );
+
+
+      buttons.push({
+        button,
+        option
+      });
+
+
+      optionsArea.appendChild(
+        button
+      );
+    }
+  );
+
+
+  function revealPhrase(
+    mode,
+    selectedButton = null,
+    selectedOption = null
+  ) {
+
+    buttons.forEach(
+      ({
+        button,
+        option
+      }) => {
+
+        button.disabled = true;
+
+
+        if (option.correct) {
+
+          button.classList.add(
+            "correct"
+          );
+        }
+      }
+    );
+
+
+    if (
+      mode !== "correct" &&
+      selectedButton &&
+      selectedOption &&
+      !selectedOption.correct
+    ) {
+
+      selectedButton.classList.add(
+        "wrong"
+      );
+    }
+
+
+    correctAnswer.textContent =
+      `Answer: ${data.target}`;
+  }
+
+
+  testState.currentReveal =
+    mode =>
+      revealPhrase(mode);
+}
+
+
+/* =========================================================
+   TEST RESULT MESSAGE
+   ========================================================= */
+
+function getTestAchievement(
+  accuracy
+) {
+
+  if (accuracy === 100) {
+
+    return {
+      emoji: "👑",
+      text: "Excellent Reader!"
+    };
+  }
+
+
+  if (accuracy >= 90) {
+
+    return {
+      emoji: "🌟",
+      text: "Great Reader!"
+    };
+  }
+
+
+  if (accuracy >= 80) {
+
+    return {
+      emoji: "👏",
+      text: "Good Reader!"
+    };
+  }
+
+
+  if (accuracy >= 70) {
+
+    return {
+      emoji: "📖",
+      text: "Keep Reading!"
+    };
+  }
+
+
+  if (accuracy >= 50) {
+
+    return {
+      emoji: "💪",
+      text: "Keep Practicing!"
+    };
+  }
+
+
+  return {
+    emoji: "🔄",
+    text: "Review and Try Again!"
+  };
+}
+
+
+/* =========================================================
+   TEST RESULT SCREEN
+   ========================================================= */
+
+function renderTestResult(app) {
+
+  clearTestTimers();
+
+
+  const total =
+    testState.questions.length;
+
+
+  const score =
+    testState.score;
+
+
+  const accuracy =
+    Math.round(
+      score /
+      total *
+      100
+    );
+
+
+  const achievement =
+    getTestAchievement(
+      accuracy
+    );
+
+
+  const review =
+    testState.reviewSentences;
+
+
+  const visibleReview =
+    review.slice(0, 5);
+
+
+  const hasMore =
+    review.length > 5;
+
+
+  playSound("victory");
+
+
+  let reviewHTML = "";
+
+
+  if (
+    review.length === 0
+  ) {
+
+    reviewHTML = `
+      <div class="review-none">
+        None 🎉
+      </div>
+    `;
+
+  } else {
+
+    reviewHTML =
+      visibleReview
+        .map(
+          (
+            sentence,
+            index
+          ) => `
+            <div class="review-sentence">
+              ${index + 1}. ${escapeHTML(sentence)}
+            </div>
+          `
+        )
+        .join("");
+
+
+    if (hasMore) {
+
+      reviewHTML += `
+        <div class="review-more">
+          and more...
+        </div>
+      `;
+    }
+  }
+
+
+  const adviceHTML =
+    hasMore
+      ? `
+        <p class="test-result-advice">
+          📖 Try Reading Practice again before taking the test.
+        </p>
+      `
+      : "";
+
+
+  app.innerHTML = `
+    <section class="test-result">
+
+      <div class="result-card test-result-card">
+
+        <h1 class="test-achievement">
+          ${achievement.emoji}
+          ${achievement.text}
+        </h1>
+
+        <div class="test-result-summary">
+
+          <div>
+            📚 Grade 1 · Lesson ${currentLesson.lessonNumber}
+          </div>
+
+          <div>
+            ⭐ Score:
+            <strong>
+              ${score}/${total}
+            </strong>
+            (🎯 ${accuracy}%)
+          </div>
+
+        </div>
+
+        <div class="test-review">
+
+          <h2>
+            📝 Sentences to Review:
+          </h2>
+
+          <div class="review-list">
+            ${reviewHTML}
+          </div>
+
+        </div>
+
+        ${adviceHTML}
+
+        <div class="result-buttons">
+
+          <button
+            type="button"
+            class="copy-result-button"
+            id="copyResultButton"
+          >
+            📋 Copy Result
+          </button>
+
+          <button
+            type="button"
+            id="testAgainButton"
+          >
+            🔄 Try Again
+          </button>
+
+          <button
+            type="button"
+            id="testMenuButton"
+          >
+            ← Lesson Menu
+          </button>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+
+
+  document
+    .getElementById(
+      "copyResultButton"
+    )
+    .addEventListener(
+      "click",
+      copyTestResult
+    );
+
+
+  document
+    .getElementById(
+      "testAgainButton"
+    )
+    .addEventListener(
+      "click",
+      () => {
+
+        startReadingTest(
+          app,
+          currentLesson
+        );
+      }
+    );
+
+
+  document
+    .getElementById(
+      "testMenuButton"
+    )
+    .addEventListener(
+      "click",
+      goBackToLessonMenu
+    );
+}
+
+
+/* =========================================================
+   COPY TEST RESULT
+   ========================================================= */
+
+async function copyTestResult() {
+
+  if (!testState) return;
+
+
+  const total =
+    testState.questions.length;
+
+  const score =
+    testState.score;
+
+  const accuracy =
+    Math.round(
+      score /
+      total *
+      100
+    );
+
+
+  const achievement =
+    getTestAchievement(
+      accuracy
+    );
+
+
+  const review =
+    testState.reviewSentences;
+
+
+  const visibleReview =
+    review.slice(
+      0,
+      5
+    );
+
+
+  const lines = [
+    `${achievement.emoji} ${achievement.text}`,
+    `📚 Grade 1 · Lesson ${currentLesson.lessonNumber}`,
+    `⭐ Score: ${score}/${total} (🎯 ${accuracy}%)`,
+    "",
+    "📝 Sentences to Review:"
+  ];
+
+
+  if (
+    review.length === 0
+  ) {
+
+    lines.push(
+      "None 🎉"
+    );
+
+  } else {
+
+    visibleReview.forEach(
+      (
+        sentence,
+        index
+      ) => {
+
+        lines.push(
+          `${index + 1}. ${sentence}`
+        );
+      }
+    );
+
+
+    if (
+      review.length > 5
+    ) {
+
+      lines.push(
+        "and more..."
+      );
+
+      lines.push("");
+
+      lines.push(
+        "📖 Try Reading Practice again before taking the test."
+      );
+    }
+  }
+
+
+  const text =
+    lines.join("\n");
+
+
+  const button =
+    document.getElementById(
+      "copyResultButton"
+    );
+
+
+  try {
+
+    await navigator.clipboard.writeText(
+      text
+    );
+
+
+    showCopiedButton(
+      button
+    );
+
+  } catch (error) {
+
+    fallbackCopyText(text);
+
+    showCopiedButton(
+      button
+    );
+  }
+}
+
+
+function fallbackCopyText(text) {
+
+  const textarea =
+    document.createElement(
+      "textarea"
+    );
+
+
+  textarea.value =
+    text;
+
+
+  textarea.style.position =
+    "fixed";
+
+  textarea.style.opacity =
+    "0";
+
+
+  document.body.appendChild(
+    textarea
+  );
+
+
+  textarea.select();
+
+
+  document.execCommand(
+    "copy"
+  );
+
+
+  document.body.removeChild(
+    textarea
+  );
+}
+
+
+function showCopiedButton(
+  button
+) {
+
+  if (!button) return;
+
+
+  const original =
+    button.textContent;
+
+
+  button.textContent =
+    "✅ Copied!";
+
+
+  setTimeout(
+    () => {
+
+      button.textContent =
+        original;
+
+    },
+    1500
+  );
+}
+
+
+/* =========================================================
+   UTILITY: SPLIT SEMICOLON
+   ========================================================= */
+
+function splitSemicolon(text) {
+
+  return text
+    .split(";")
+    .map(
+      item =>
+        item.trim()
+    )
+    .filter(Boolean);
+}
+
+
+/* =========================================================
+   UTILITY: WORD COUNT
+   ========================================================= */
+
+function countWords(text) {
+
+  const cleaned =
+    text.trim();
+
+
+  if (!cleaned) {
+    return 0;
+  }
+
+
+  return cleaned
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+
+/* =========================================================
+   UTILITY: DISABLE BUTTONS
+   ========================================================= */
+
+function disableButtons(buttons) {
+
+  buttons.forEach(
+    button => {
+
+      button.disabled = true;
+    }
+  );
+}
+
+
+/* =========================================================
+   UTILITY: RANDOM CHOICE
+   ========================================================= */
+
+function randomChoice(array) {
+
+  if (!array.length) {
+    return null;
+  }
+
+
+  return array[
+    Math.floor(
+      Math.random() *
+      array.length
+    )
+  ];
+}
+
+
+/* =========================================================
+   UTILITY: SHUFFLE
+   ========================================================= */
+
+function shuffleArray(array) {
+
+  for (
+    let i =
+      array.length - 1;
+
+    i > 0;
+
+    i--
+  ) {
+
+    const j =
+      Math.floor(
+        Math.random() *
+        (i + 1)
+      );
+
+
+    [
+      array[i],
+      array[j]
+    ] = [
+      array[j],
+      array[i]
+    ];
+  }
+
+
+  return array;
+}
+
+
+/* =========================================================
+   UTILITY: ESCAPE HTML
+   ========================================================= */
+
+function escapeHTML(text) {
+
+  return String(text)
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
+
+
+/* =========================================================
+   LOADING
    ========================================================= */
 
 function showLoading(app) {
@@ -2043,6 +5246,10 @@ function renderError(
   app,
   error
 ) {
+
+  clearPracticeTimers();
+  clearTestTimers();
+
 
   app.innerHTML = "";
 
@@ -2084,36 +5291,4 @@ function renderError(
 
 
   app.appendChild(box);
-}
-
-
-/* =========================================================
-   SHUFFLE
-   ========================================================= */
-
-function shuffleArray(array) {
-
-  for (
-    let i = array.length - 1;
-    i > 0;
-    i--
-  ) {
-
-    const j =
-      Math.floor(
-        Math.random() * (i + 1)
-      );
-
-
-    [
-      array[i],
-      array[j]
-    ] = [
-      array[j],
-      array[i]
-    ];
-  }
-
-
-  return array;
 }
