@@ -1,0 +1,72 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f7f8fc;
+  color: #222;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.lesson-menu {
+  width: 100%;
+  max-width: 520px;
+  text-align: center;
+  background: white;
+  padding: 40px 28px;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.lesson-heading {
+  margin: 0 0 12px;
+  font-size: 28px;
+}
+
+.reading-title {
+  margin-bottom: 32px;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.lesson-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lesson-buttons button {
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.practice-button {
+  background: #e8f0ff;
+}
+
+.test-button {
+  background: #222;
+  color: white;
+}
+
+.data-status {
+  margin-top: 22px;
+  font-size: 13px;
+  color: #888;
+}
+
+.loading,
+.error-message {
+  text-align: center;
+}
