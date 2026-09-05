@@ -224,3 +224,30 @@ body {
 #practiceMenuButton {
   background: #eef1f6;
 }
+
+.practice-progress-wrap {
+  width: 180px;
+}
+
+.practice-progress-text {
+  text-align: right;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.practice-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #e8ebf0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.practice-progress-fill {
+  width: 0;
+  height: 100%;
+  background: #222;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
