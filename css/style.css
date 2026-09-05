@@ -660,8 +660,7 @@ body {
 }
 
 .test-option,
-.sequence-option,
-.ordering-selected-item {
+.sequence-option {
   width: 100%;
 
   padding: 14px 16px;
@@ -691,25 +690,21 @@ body {
 }
 
 .test-option:active:not(:disabled),
-.sequence-option:active:not(:disabled),
-.ordering-selected-item:active:not(:disabled) {
+.sequence-option:active:not(:disabled) {
   transform: scale(0.99);
 }
 
 @media (hover: hover) and (pointer: fine) {
 
   .test-option:hover:not(:disabled),
-  .sequence-option:hover:not(:disabled),
-  .ordering-selected-item:hover:not(:disabled) {
+  .sequence-option:hover:not(:disabled) {
     background: #f5f7fb;
   }
 }
 
 .test-option:disabled,
-.sequence-option:disabled,
-.ordering-selected-item:disabled {
+.sequence-option:disabled {
   cursor: default;
-
   opacity: 1;
 }
 
@@ -851,48 +846,6 @@ body {
 
 
 /* =========================================================
-   SENTENCE ORDERING
-   ========================================================= */
-
-.ordering-selected {
-  display: flex;
-  flex-direction: column;
-
-  min-height: 54px;
-
-  margin-bottom: 14px;
-  padding: 10px;
-
-  gap: 8px;
-
-  border: 1px dashed #c9cfda;
-  border-radius: 12px;
-
-  background: #f8f9fc;
-}
-
-.ordering-selected:empty::before {
-  content: "Tap the chunks below in order.";
-
-  padding: 8px 4px;
-
-  color: #999;
-
-  font-size: 0.9rem;
-}
-
-.ordering-selected-item {
-  border-color: #bfcaf3;
-
-  background: #eef2ff;
-
-  color: #294696;
-
-  font-weight: 700;
-}
-
-
-/* =========================================================
    FIND THE ERROR
    ========================================================= */
 
@@ -943,27 +896,6 @@ body {
 
 .error-choice.selected-wrong {
   outline: 2px solid rgba(181, 71, 71, 0.2);
-}
-
-
-/* =========================================================
-   TEXT SEQUENCE
-   ========================================================= */
-
-.sequence-option {
-  position: relative;
-
-  padding-left: 16px;
-}
-
-.sequence-option.selected {
-  border-color: #8fa7ed;
-
-  background: #eef2ff;
-
-  color: #294696;
-
-  font-weight: 700;
 }
 
 
@@ -1385,5 +1317,487 @@ body {
 
   .test-korean {
     font-size: 0.94rem;
+  }
+}
+
+/* =========================================================
+   READING TEST — NEXT BUTTON
+   ========================================================= */
+
+.test-next-button {
+  width: 100%;
+
+  margin-top: 18px;
+  padding: 14px 18px;
+
+  border: none;
+  border-radius: 12px;
+
+  background: #222;
+  color: #fff;
+
+  font-size: 1rem;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.test-next-button:active {
+  transform: scale(0.985);
+}
+
+
+/* =========================================================
+   SENTENCE ORDERING — SLOT AREA
+   ========================================================= */
+
+.ordering-slots {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(110px, 1fr));
+
+  gap: 10px;
+
+  margin-bottom: 18px;
+}
+
+
+/*
+  비어 있는 numbered slot
+*/
+
+.ordering-slot {
+  min-height: 58px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px;
+
+  border: 1px dashed #cbd1db;
+  border-radius: 12px;
+
+  background: #f1f3f6;
+
+  color: #a0a5ad;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+/*
+  1, 2, 3, 4 ...
+*/
+
+.ordering-slot-number {
+  font-size: 1rem;
+  font-weight: 800;
+
+  color: #9ca3ad;
+}
+
+
+/*
+  chunk가 들어간 slot
+*/
+
+.ordering-slot.filled {
+  padding: 0;
+
+  border-style: solid;
+  border-color: #aebce9;
+
+  background: #eef2ff;
+}
+
+
+/*
+  slot 안의 chunk
+*/
+
+.ordering-slot-chunk {
+  width: 100%;
+  min-height: 56px;
+
+  padding: 11px 12px;
+
+  border: none;
+  border-radius: 11px;
+
+  background: transparent;
+
+  color: #294696;
+
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.4;
+
+  cursor: grab;
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.ordering-slot-chunk:active {
+  cursor: grabbing;
+}
+
+
+/*
+  drag 중 놓을 수 있는 slot
+*/
+
+.ordering-slot.drag-over {
+  border-color: #315efb;
+
+  background: #e5ebff;
+
+  transform: scale(1.02);
+}
+
+
+/*
+  아래의 아직 선택되지 않은 chunk
+*/
+
+.ordering-chunk {
+  cursor: grab;
+}
+
+.ordering-chunk:active {
+  cursor: grabbing;
+}
+
+
+/* =========================================================
+   TEXT SEQUENCE
+   ========================================================= */
+
+.sequence-options {
+  display: flex;
+  flex-direction: column;
+
+  gap: 11px;
+}
+
+
+/*
+  문장 하나의 전체 블록
+*/
+
+.sequence-option {
+  width: 100%;
+
+  display: flex;
+  align-items: flex-start;
+
+  gap: 12px;
+
+  padding: 13px 15px;
+
+  border: 1px solid #dfe3ea;
+  border-radius: 12px;
+
+  background: #fff;
+
+  color: #222;
+
+  text-align: left;
+
+  font: inherit;
+  font-size: 0.96rem;
+  line-height: 1.5;
+
+  cursor: pointer;
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+
+/*
+  선택된 문장
+*/
+
+.sequence-option.selected {
+  border-color: #8fa7ed;
+
+  background: #eef2ff;
+}
+
+
+/*
+  문장 앞 둥근 정사각형 번호칸
+*/
+
+.sequence-number-box {
+  flex: 0 0 30px;
+
+  width: 30px;
+  height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-top: 1px;
+
+  border-radius: 9px;
+
+  background: #eef1f5;
+
+  color: #6d7480;
+
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+
+/*
+  선택된 문장의 번호칸
+*/
+
+.sequence-option.selected
+.sequence-number-box {
+  background: #315efb;
+
+  color: #fff;
+}
+
+
+/*
+  영어 문장 본문
+*/
+
+.sequence-sentence-text {
+  flex: 1;
+
+  min-width: 0;
+}
+
+
+/* =========================================================
+   TEXT SEQUENCE — TRY AGAIN
+   ========================================================= */
+
+.sequence-try-again {
+  min-height: 26px;
+
+  margin-top: 14px;
+
+  text-align: center;
+
+  color: #8b2f2f;
+
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+
+/*
+  진동 효과
+*/
+
+.sequence-option.shake {
+  animation:
+    sequenceShake 0.42s ease;
+}
+
+
+@keyframes sequenceShake {
+
+  0% {
+    transform: translateX(0);
+  }
+
+  15% {
+    transform: translateX(-7px);
+  }
+
+  30% {
+    transform: translateX(7px);
+  }
+
+  45% {
+    transform: translateX(-6px);
+  }
+
+  60% {
+    transform: translateX(6px);
+  }
+
+  75% {
+    transform: translateX(-3px);
+  }
+
+  90% {
+    transform: translateX(3px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+
+/* =========================================================
+   TEXT SEQUENCE — CORRECT ORDER
+   ========================================================= */
+
+.sequence-correct-order {
+  cursor: default;
+
+  border-color: #aad5ba;
+
+  background: #edf8f1;
+}
+
+
+/*
+  영어 + 우리말 뜻을 세로 배치
+*/
+
+.sequence-answer-content {
+  flex: 1;
+
+  min-width: 0;
+}
+
+
+/*
+  정답 확인 때 우리말 뜻
+*/
+
+.sequence-korean-answer {
+  margin-top: 5px;
+
+  color: #777;
+
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   TEST ANSWER DETAILS
+   ========================================================= */
+
+.answer-line {
+  margin-bottom: 9px;
+
+  color: #237a45;
+
+  font-weight: 800;
+}
+
+
+/*
+  완성된 영어 문장
+*/
+
+.answer-full-sentence {
+  margin-top: 10px;
+
+  padding: 11px 13px;
+
+  border-radius: 10px;
+
+  background: #f5f7fb;
+
+  color: #333;
+
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+
+/*
+  문장 한국어 뜻
+*/
+
+.answer-korean {
+  margin-top: 7px;
+
+  padding: 0 3px;
+
+  color: #777;
+
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   TEST FEEDBACK
+   ========================================================= */
+
+.test-feedback.feedback-correct {
+  color: #237a45;
+}
+
+.test-feedback.feedback-wrong {
+  color: #8b2f2f;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+  .ordering-slots {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .ordering-slot {
+    min-height: 54px;
+  }
+
+  .ordering-slot-chunk {
+    min-height: 52px;
+
+    font-size: 0.9rem;
+  }
+
+  .sequence-option {
+    gap: 10px;
+
+    padding: 12px 13px;
+
+    font-size: 0.92rem;
+  }
+
+  .sequence-number-box {
+    flex-basis: 28px;
+
+    width: 28px;
+    height: 28px;
+
+    border-radius: 8px;
+  }
+
+  .sequence-korean-answer {
+    font-size: 0.84rem;
+  }
+
+  .answer-full-sentence {
+    font-size: 0.91rem;
+  }
+
+  .answer-korean {
+    font-size: 0.86rem;
   }
 }
