@@ -2,6 +2,10 @@
 
 const DATA_PATH = "data/2022M1L05R.csv";
 const LESSON_NUMBER = 5;
+const MAX_PRACTICE_ROUNDS = 3;
+
+let currentLesson = null;
+let practiceState = null;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -15,7 +19,7 @@ async function init() {
     validateCSV(rows);
 
     const lesson = buildLessonData(rows);
-
+    currentLesson = lesson;
     renderLessonMenu(app, lesson);
   } catch (error) {
     console.error(error);
@@ -292,14 +296,8 @@ function renderLessonMenu(app, lesson) {
   );
 
   practiceButton.addEventListener("click", () => {
-    console.log("Reading Practice selected");
-    console.log(
-      `${lesson.sentences.length} sentence rows available`
-    );
-
-    // 다음 단계에서 구현
-    alert("Reading Practice — coming next!");
-  });
+  startReadingPractice(app, lesson);
+});
 
   testButton.addEventListener("click", () => {
     console.log("Reading Test selected");
@@ -364,4 +362,422 @@ function renderError(app, error) {
 
   box.append(title, message);
   app.appendChild(box);
+}
+/* =========================================================
+   READING PRACTICE
+   ========================================================= */
+
+function startReadingPractice(app, lesson) {
+  const eligible = lesson.sentences.filter(row =>
+    row.korean &&
+    row.korean_distractors &&
+    row.korean_distractors.split(";").filter(Boolean).length >= 3
+  );
+
+  if (!eligible.length) {
+    renderError(
+      app,
+      new Error("Reading Practice에 사용할 문장이 없습니다.")
+    );
+    return;
+  }
+
+  practiceState = {
+    round: 1,
+    queue: shuffleArray([...eligible]),
+    retryQueue: [],
+    totalSentences: eligible.length,
+    correctCount: 0,
+    wrongCount: 0,
+    answeredCount: 0,
+    currentRow: null,
+    locked: false
+  };
+
+  renderPracticeScreen(app);
+  showNextPracticeQuestion(app);
+}
+
+
+/* =========================================================
+   PRACTICE SCREEN
+   ========================================================= */
+
+function renderPracticeScreen(app) {
+  app.innerHTML = `
+    <section class="practice-screen">
+
+      <div class="practice-topbar">
+        <button
+          type="button"
+          class="back-button"
+          id="practiceBackButton"
+        >
+          ← Lesson Menu
+        </button>
+
+        <div class="practice-progress" id="practiceProgress">
+        </div>
+      </div>
+
+      <div class="practice-card">
+
+        <div class="practice-label">
+          Choose the correct meaning.
+        </div>
+
+        <div
+          class="practice-english"
+          id="practiceEnglish"
+        ></div>
+
+        <div
+          class="practice-options"
+          id="practiceOptions"
+        ></div>
+
+        <div
+          class="practice-feedback"
+          id="practiceFeedback"
+        ></div>
+
+      </div>
+
+    </section>
+  `;
+
+  document
+    .getElementById("practiceBackButton")
+    .addEventListener("click", () => {
+      practiceState = null;
+      renderLessonMenu(app, currentLesson);
+    });
+}
+
+
+/* =========================================================
+   NEXT QUESTION
+   ========================================================= */
+
+function showNextPracticeQuestion(app) {
+  if (!practiceState) return;
+
+  if (practiceState.queue.length === 0) {
+    handlePracticeRoundEnd(app);
+    return;
+  }
+
+  const row = practiceState.queue.shift();
+
+  practiceState.currentRow = row;
+  practiceState.locked = false;
+
+  const english = cleanEnglish(row.english);
+
+  const distractors = row.korean_distractors
+    .split(";")
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  const selectedDistractors =
+    shuffleArray([...distractors]).slice(0, 3);
+
+  const options = shuffleArray([
+    {
+      text: row.korean.trim(),
+      correct: true
+    },
+    ...selectedDistractors.map(text => ({
+      text,
+      correct: false
+    }))
+  ]);
+
+  document.getElementById("practiceEnglish").textContent =
+    english;
+
+  document.getElementById("practiceFeedback").textContent =
+    "";
+
+  renderPracticeOptions(app, options);
+
+  updatePracticeProgress();
+}
+
+
+/* =========================================================
+   OPTIONS
+   ========================================================= */
+
+function renderPracticeOptions(app, options) {
+  const container =
+    document.getElementById("practiceOptions");
+
+  container.innerHTML = "";
+
+  options.forEach(option => {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "practice-option";
+    button.textContent = option.text;
+
+    button.addEventListener("click", () => {
+      handlePracticeAnswer(
+        app,
+        button,
+        option,
+        options
+      );
+    });
+
+    container.appendChild(button);
+  });
+}
+
+
+/* =========================================================
+   ANSWER
+   ========================================================= */
+
+function handlePracticeAnswer(
+  app,
+  clickedButton,
+  selectedOption
+) {
+  if (!practiceState || practiceState.locked) {
+    return;
+  }
+
+  practiceState.locked = true;
+  practiceState.answeredCount++;
+
+  const buttons = [
+    ...document.querySelectorAll(".practice-option")
+  ];
+
+  if (selectedOption.correct) {
+    practiceState.correctCount++;
+
+    clickedButton.classList.add("correct");
+
+    showPracticeFeedback("Correct!");
+
+  } else {
+    practiceState.wrongCount++;
+
+    clickedButton.classList.add("wrong");
+
+    const correctButton = buttons.find(
+      button =>
+        button.textContent.trim() ===
+        practiceState.currentRow.korean.trim()
+    );
+
+    if (correctButton) {
+      correctButton.classList.add("correct");
+    }
+
+    practiceState.retryQueue.push(
+      practiceState.currentRow
+    );
+
+    showPracticeFeedback("Try this sentence again.");
+  }
+
+  buttons.forEach(button => {
+    button.disabled = true;
+  });
+
+  updatePracticeProgress();
+
+  setTimeout(() => {
+    showNextPracticeQuestion(app);
+  }, 900);
+}
+
+
+/* =========================================================
+   FEEDBACK
+   ========================================================= */
+
+function showPracticeFeedback(message) {
+  const feedback =
+    document.getElementById("practiceFeedback");
+
+  feedback.textContent = message;
+}
+
+
+/* =========================================================
+   ROUND CONTROL
+   ========================================================= */
+
+function handlePracticeRoundEnd(app) {
+  if (!practiceState) return;
+
+  const hasRetries =
+    practiceState.retryQueue.length > 0;
+
+  const canContinue =
+    practiceState.round < MAX_PRACTICE_ROUNDS;
+
+  if (hasRetries && canContinue) {
+    practiceState.round++;
+
+    practiceState.queue =
+      shuffleArray([
+        ...practiceState.retryQueue
+      ]);
+
+    practiceState.retryQueue = [];
+
+    showPracticeRoundMessage(app);
+    return;
+  }
+
+  renderPracticeResult(app);
+}
+
+
+function showPracticeRoundMessage(app) {
+  const card = document.querySelector(".practice-card");
+
+  card.innerHTML = `
+    <div class="round-message">
+      <h2>Round ${practiceState.round}</h2>
+      <p>
+        Let's review the sentences you missed.
+      </p>
+    </div>
+  `;
+
+  updatePracticeProgress();
+
+  setTimeout(() => {
+    renderPracticeScreen(app);
+    showNextPracticeQuestion(app);
+  }, 1000);
+}
+
+
+/* =========================================================
+   PROGRESS
+   ========================================================= */
+
+function updatePracticeProgress() {
+  const progress =
+    document.getElementById("practiceProgress");
+
+  if (!progress || !practiceState) return;
+
+  const remaining =
+    practiceState.queue.length;
+
+  progress.textContent =
+    `Round ${practiceState.round} · ` +
+    `${remaining} left`;
+}
+
+
+/* =========================================================
+   RESULT
+   ========================================================= */
+
+function renderPracticeResult(app) {
+  const unresolved =
+    practiceState.retryQueue.length;
+
+  const allMastered =
+    unresolved === 0;
+
+  app.innerHTML = `
+    <section class="practice-result">
+
+      <div class="result-card">
+
+        <h1>
+          ${allMastered
+            ? "Practice Complete!"
+            : "Practice Finished"}
+        </h1>
+
+        <p class="result-message">
+          ${
+            allMastered
+              ? "You understood all the sentences."
+              : `${unresolved} sentence${
+                  unresolved === 1 ? "" : "s"
+                } still need review.`
+          }
+        </p>
+
+        <div class="result-stats">
+          <div>
+            <strong>${practiceState.correctCount}</strong>
+            <span>Correct</span>
+          </div>
+
+          <div>
+            <strong>${practiceState.wrongCount}</strong>
+            <span>Wrong</span>
+          </div>
+        </div>
+
+        <div class="result-buttons">
+          <button
+            type="button"
+            id="practiceAgainButton"
+          >
+            🔄 Practice Again
+          </button>
+
+          <button
+            type="button"
+            id="practiceMenuButton"
+          >
+            ← Lesson Menu
+          </button>
+        </div>
+
+      </div>
+
+    </section>
+  `;
+
+  document
+    .getElementById("practiceAgainButton")
+    .addEventListener("click", () => {
+      startReadingPractice(
+        app,
+        currentLesson
+      );
+    });
+
+  document
+    .getElementById("practiceMenuButton")
+    .addEventListener("click", () => {
+      practiceState = null;
+      renderLessonMenu(
+        app,
+        currentLesson
+      );
+    });
+}
+
+
+/* =========================================================
+   UTILITIES
+   ========================================================= */
+
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j =
+      Math.floor(Math.random() * (i + 1));
+
+    [array[i], array[j]] =
+      [array[j], array[i]];
+  }
+
+  return array;
 }
