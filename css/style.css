@@ -1801,3 +1801,130 @@ body {
     font-size: 0.86rem;
   }
 }
+
+
+/* =========================================================
+   ORDER SENTENCES — FIXED FIRST SENTENCE
+   ========================================================= */
+
+.sequence-option.sequence-correct-order {
+  cursor: default;
+
+  border-color: #aad5ba;
+  background: #edf8f1;
+}
+
+.sequence-option.sequence-correct-order
+.sequence-number-box {
+  background: #2f9d5b;
+  color: #fff;
+}
+
+
+/* =========================================================
+   ORDER SENTENCES — ANSWER CONTENT
+   ========================================================= */
+
+.sequence-answer-content {
+  flex: 1;
+
+  min-width: 0;
+}
+
+.sequence-sentence-text {
+  line-height: 1.5;
+}
+
+.sequence-korean-answer {
+  margin-top: 5px;
+
+  color: #777;
+
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   TEST ANSWER DETAILS
+   ========================================================= */
+
+.answer-line {
+  margin-bottom: 9px;
+
+  color: #237a45;
+
+  font-weight: 800;
+}
+
+.answer-full-sentence {
+  margin-top: 10px;
+
+  padding: 11px 13px;
+
+  border-radius: 10px;
+
+  background: #f5f7fb;
+
+  color: #333;
+
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.answer-korean {
+  margin-top: 7px;
+
+  padding: 0 3px;
+
+  color: #777;
+
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   UNSCRAMBLE SENTENCE — ANSWER SLOTS
+   ========================================================= */
+
+.ordering-slot.filled {
+  border-style: solid;
+  border-color: #aebce9;
+
+  background: #eef2ff;
+}
+
+.ordering-slot.filled
+.ordering-slot-number {
+  margin-right: 8px;
+
+  color: #6f7fb8;
+}
+
+.ordering-slot.filled
+.ordering-slot-chunk {
+  cursor: default;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+  .sequence-korean-answer {
+    font-size: 0.84rem;
+  }
+
+  .answer-full-sentence {
+    font-size: 0.91rem;
+  }
+
+  .answer-korean {
+    font-size: 0.86rem;
+  }
+}
