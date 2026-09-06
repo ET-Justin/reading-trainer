@@ -239,32 +239,71 @@ function navigateTo(route) {
 }
 
 function renderCurrentRoute(app) {
+
   clearPracticeTimers();
   clearTestTimers();
+
 
   const route =
     getCurrentRoute();
 
-  if (route === "practice") {
+
+  if (
+    route === "listen"
+  ) {
+
+    practiceState =
+      null;
+
+    testState =
+      null;
+
+
+    renderListenToText(
+      app,
+      currentLesson
+    );
+
+    return;
+  }
+
+
+  if (
+    route === "practice"
+  ) {
+
     startReadingPractice(
       app,
       currentLesson
     );
+
     return;
   }
 
-  if (route === "test") {
-    practiceState = null;
+
+  if (
+    route === "test"
+  ) {
+
+    practiceState =
+      null;
+
 
     renderTestStart(
       app,
       currentLesson
     );
+
     return;
   }
 
-  practiceState = null;
-  testState = null;
+
+  practiceState =
+    null;
+
+  testState =
+    null;
+
 
   renderLessonMenu(
     app,
@@ -490,11 +529,29 @@ function validateCSV(rows) {
    ========================================================= */
 
 function buildLessonData(rows) {
+
   const titleRow =
     rows.find(
       row =>
-        row.id.endsWith("0000")
+        row.id.endsWith(
+          "0000"
+        )
     );
+
+
+  /*
+    각 단원의 본문 듣기 링크는
+    ID가 ...0099인 행에 저장한다.
+  */
+
+  const listenRow =
+    rows.find(
+      row =>
+        row.id.endsWith(
+          "0099"
+        )
+    );
+
 
   const title =
     titleRow
@@ -503,17 +560,30 @@ function buildLessonData(rows) {
         )
       : "Reading";
 
+
+  const listenUrl =
+    listenRow
+      ? listenRow.english.trim()
+      : "";
+
+
   const sentences =
     rows.filter(
       row =>
-        isSentenceRow(row)
+        isSentenceRow(
+          row
+        )
     );
 
+
   return {
+
     lessonNumber:
       LESSON_NUMBER,
 
     title,
+
+    listenUrl,
 
     rows,
 
@@ -521,21 +591,36 @@ function buildLessonData(rows) {
   };
 }
 
-
 /* =========================================================
    SENTENCE ROW
    ========================================================= */
 
 function isSentenceRow(row) {
+
   const id =
     row.id.trim();
 
-  if (!/^\d{7}$/.test(id)) {
+
+  if (
+    !/^\d{7}$/.test(id)
+  ) {
+
     return false;
   }
 
+
+  /*
+    00 = 제목/소제목 등의 비문장 행
+    99 = 본문 듣기 링크 행
+  */
+
+  const sentenceNumber =
+    id.slice(-2);
+
+
   return (
-    id.slice(-2) !== "00"
+    sentenceNumber !== "00" &&
+    sentenceNumber !== "99"
   );
 }
 
@@ -582,20 +667,26 @@ function renderLessonMenu(
   app,
   lesson
 ) {
-  app.innerHTML = "";
+
+  app.innerHTML =
+    "";
+
 
   const section =
     document.createElement(
       "section"
     );
 
+
   section.className =
     "lesson-menu";
+
 
   const heading =
     document.createElement(
       "h1"
     );
+
 
   heading.className =
     "lesson-heading";
@@ -603,10 +694,12 @@ function renderLessonMenu(
   heading.textContent =
     `Lesson ${lesson.lessonNumber}. Reading`;
 
+
   const title =
     document.createElement(
       "div"
     );
+
 
   title.className =
     "reading-title";
@@ -614,13 +707,56 @@ function renderLessonMenu(
   title.textContent =
     `<${lesson.title}>`;
 
+
   const buttons =
     document.createElement(
       "div"
     );
 
+
   buttons.className =
     "lesson-buttons";
+
+
+  /*
+    본문 듣기
+  */
+
+  const listenButton =
+    createButton(
+      "🎧 Listen to the Text",
+      "listen-button"
+    );
+
+
+  /*
+    해당 단원 CSV에
+    ...0099 링크가 없으면 비활성화
+  */
+
+  if (
+    !lesson.listenUrl
+  ) {
+
+    listenButton.disabled =
+      true;
+
+    listenButton.title =
+      "Listening material is not available.";
+
+  } else {
+
+    listenButton.addEventListener(
+      "click",
+      () => {
+
+        navigateTo(
+          "listen"
+        );
+      }
+    );
+  }
+
 
   const practiceButton =
     createButton(
@@ -628,39 +764,55 @@ function renderLessonMenu(
       "practice-button"
     );
 
+
   const testButton =
     createButton(
       "📝 Reading Test",
       "test-button"
     );
 
+
   practiceButton.addEventListener(
     "click",
     () => {
-      navigateTo("practice");
+
+      navigateTo(
+        "practice"
+      );
     }
   );
+
 
   testButton.addEventListener(
     "click",
     () => {
-      navigateTo("test");
+
+      navigateTo(
+        "test"
+      );
     }
   );
 
+
   buttons.append(
+    listenButton,
     practiceButton,
     testButton
   );
 
+
   const info =
-    document.createElement("p");
+    document.createElement(
+      "p"
+    );
+
 
   info.className =
     "data-status";
 
   info.textContent =
     `${lesson.sentences.length} sentences loaded`;
+
 
   section.append(
     heading,
@@ -669,9 +821,199 @@ function renderLessonMenu(
     info
   );
 
-  app.appendChild(section);
+
+  app.appendChild(
+    section
+  );
 }
 
+/* =========================================================
+   LISTEN TO THE TEXT
+   ========================================================= */
+
+function renderListenToText(
+  app,
+  lesson
+) {
+
+  app.innerHTML =
+    "";
+
+
+  const section =
+    document.createElement(
+      "section"
+    );
+
+
+  section.className =
+    "listen-screen";
+
+
+  /*
+    상단 메뉴 복귀 버튼
+  */
+
+  const topbar =
+    document.createElement(
+      "div"
+    );
+
+
+  topbar.className =
+    "listen-topbar";
+
+
+  const backButton =
+    createButton(
+      "← Lesson Menu",
+      "back-button"
+    );
+
+
+  backButton.addEventListener(
+    "click",
+    () => {
+
+      navigateTo("");
+    }
+  );
+
+
+  topbar.appendChild(
+    backButton
+  );
+
+
+  /*
+    화면 제목
+  */
+
+  const heading =
+    document.createElement(
+      "h1"
+    );
+
+
+  heading.className =
+    "listen-heading";
+
+  heading.textContent =
+    "🎧 Listen to the Text";
+
+
+  /*
+    16:9 iframe container
+  */
+
+  const player =
+    document.createElement(
+      "div"
+    );
+
+
+  player.className =
+    "listen-player";
+
+
+  if (
+    lesson.listenUrl
+  ) {
+
+    const iframe =
+      document.createElement(
+        "iframe"
+      );
+
+
+    iframe.className =
+      "listen-iframe";
+
+
+    iframe.src =
+      lesson.listenUrl;
+
+
+    iframe.title =
+      `Lesson ${lesson.lessonNumber} Listening`;
+
+
+    iframe.allow =
+      "autoplay; fullscreen";
+
+
+    iframe.allowFullscreen =
+      true;
+
+
+    iframe.setAttribute(
+      "loading",
+      "eager"
+    );
+
+
+    iframe.setAttribute(
+      "referrerpolicy",
+      "strict-origin-when-cross-origin"
+    );
+
+
+    player.appendChild(
+      iframe
+    );
+
+  } else {
+
+    const unavailable =
+      document.createElement(
+        "p"
+      );
+
+
+    unavailable.className =
+      "listen-unavailable";
+
+
+    unavailable.textContent =
+      "Listening material is not available.";
+
+
+    player.appendChild(
+      unavailable
+    );
+  }
+
+
+  /*
+    저작권 안내
+  */
+
+  const copyright =
+    document.createElement(
+      "p"
+    );
+
+
+  copyright.className =
+    "listen-copyright";
+
+
+  copyright.textContent =
+    "이 저작물은 학교 수업 목적으로만 사용할 수 있습니다. © (주)천재교과서";
+
+
+  section.append(
+    topbar,
+    heading,
+    player,
+    copyright
+  );
+
+
+  app.appendChild(
+    section
+  );
+}
 
 /* =========================================================
    BUTTON FACTORY
