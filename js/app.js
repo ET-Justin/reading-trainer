@@ -4758,6 +4758,21 @@ function renderTextSequenceTest(
    =========================================================
    ========================================================= */
 
+/* =========================================================
+   MISSING PHRASE — OPTION CLEANING
+   ========================================================= */
+
+function removeFinalPunctuation(text) {
+
+  return String(text)
+    .trim()
+    .replace(
+      /[.!?]+$/,
+      ""
+    )
+    .trim();
+}
+
 function parsePhraseData(row) {
 
   const raw =
@@ -4972,30 +4987,45 @@ displayChunks[
       "phraseCorrectAnswer"
     );
 
-  const distractors =
-    shuffleArray(
-      [...data.distractors]
-    ).slice(
-      0,
-      3
-    );
+const distractors =
+  shuffleArray(
+    data.distractors.map(
+      text =>
+        removeFinalPunctuation(
+          text
+        )
+    )
+  ).slice(
+    0,
+    3
+  );
 
-  const options =
-    shuffleArray([
-      {
-        text:
-          data.target,
+
+const correctChoice =
+  removeFinalPunctuation(
+    data.target
+  );
+
+
+const options =
+  shuffleArray([
+    {
+      text:
+        correctChoice,
+
+      correct:
+        true
+    },
+
+    ...distractors.map(
+      text => ({
+        text,
+
         correct:
-          true
-      },
-
-      ...distractors.map(
-        text => ({
-          text,
-          correct: false
-        })
-      )
-    ]);
+          false
+      })
+    )
+  ]);
 
   const buttons = [];
 
@@ -5089,9 +5119,11 @@ displayChunks[
       <div class="answer-line">
         Answer:
         <strong>
-          ${escapeHTML(
-            data.target
-          )}
+        ${escapeHTML(
+          removeFinalPunctuation(
+           data.target
+          )
+       )}
         </strong>
       </div>
 
