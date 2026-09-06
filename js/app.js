@@ -836,8 +836,16 @@ function renderListenToText(
   lesson
 ) {
 
-  app.innerHTML =
-    "";
+  /*
+    Listen 화면에서는
+    #app의 일반 폭 제한을 사용하지 않는다.
+  */
+
+  app.innerHTML = "";
+
+  app.classList.add(
+    "listen-mode"
+  );
 
 
   const section =
@@ -851,7 +859,7 @@ function renderListenToText(
 
 
   /*
-    상단 메뉴 복귀 버튼
+    상단 메뉴 복귀 영역
   */
 
   const topbar =
@@ -875,35 +883,38 @@ function renderListenToText(
     "click",
     () => {
 
+      app.classList.remove(
+        "listen-mode"
+      );
+
+
       navigateTo("");
     }
   );
 
 
-  topbar.appendChild(
-    backButton
-  );
-
-
-  /*
-    화면 제목
-  */
-
   const heading =
     document.createElement(
-      "h1"
+      "div"
     );
 
 
   heading.className =
-    "listen-heading";
+    "listen-title";
+
 
   heading.textContent =
     "🎧 Listen to the Text";
 
 
+  topbar.append(
+    backButton,
+    heading
+  );
+
+
   /*
-    16:9 iframe container
+    본문 듣기 iframe
   */
 
   const player =
@@ -944,18 +955,6 @@ function renderListenToText(
 
     iframe.allowFullscreen =
       true;
-
-
-    iframe.setAttribute(
-      "loading",
-      "eager"
-    );
-
-
-    iframe.setAttribute(
-      "referrerpolicy",
-      "strict-origin-when-cross-origin"
-    );
 
 
     player.appendChild(
@@ -1004,7 +1003,6 @@ function renderListenToText(
 
   section.append(
     topbar,
-    heading,
     player,
     copyright
   );
