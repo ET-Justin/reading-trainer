@@ -574,19 +574,18 @@ function backToGrades() {
 
 /*
 
-  Examples
-
-  Grade 1 · Lesson 5
+  Normal Lesson
   data/2022M1L05R.csv
 
-  Grade 2 · Lesson 3
-  data/2022M2L03R.csv
+  Special Lesson
+  data/2022M1L09R_SL.csv
 
 */
 
 function getReadingCsvPath(
   grade,
-  lesson
+  lesson,
+  special = false
 ) {
 
   const lessonNumber =
@@ -599,7 +598,8 @@ function getReadingCsvPath(
 
   return (
     `data/2022M${grade}` +
-    `L${lessonNumber}R.csv`
+    `L${lessonNumber}R` +
+    `${special ? "_SL" : ""}.csv`
   );
 }
 
@@ -629,10 +629,12 @@ async function discoverLessons(
   );
 
 
-  buttons.innerHTML = "";
+  buttons.innerHTML =
+    "";
 
 
-  const checks = [];
+  const checks =
+    [];
 
 
   for (
@@ -656,20 +658,27 @@ async function discoverLessons(
     );
 
 
-  const foundLessons = [];
+  const foundLessons =
+    [];
 
 
   results.forEach(
     (
-      exists,
+      result,
       index
     ) => {
 
-      if (exists) {
+      if (
+        result.exists
+      ) {
 
-        foundLessons.push(
-          index + 1
-        );
+        foundLessons.push({
+          lesson:
+            index + 1,
+
+          special:
+            result.special
+        });
       }
     }
   );
@@ -696,10 +705,15 @@ async function checkLessonExists(
   lesson
 ) {
 
-  const path =
+  /*
+    1. 먼저 일반 Lesson 확인
+  */
+
+  const normalPath =
     getReadingCsvPath(
       grade,
-      lesson
+      lesson,
+      false
     );
 
 
@@ -707,19 +721,88 @@ async function checkLessonExists(
 
     const response =
       await fetch(
-        path,
+        normalPath,
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       );
 
 
-    return response.ok;
+    if (
+      response.ok
+    ) {
+
+      return {
+        exists:
+          true,
+
+        special:
+          false
+      };
+    }
 
   } catch (error) {
 
-    return false;
+    /*
+      일반 파일이 없으면
+      Special Lesson 확인으로 진행
+    */
   }
+
+
+  /*
+    2. Special Lesson 확인
+  */
+
+  const specialPath =
+    getReadingCsvPath(
+      grade,
+      lesson,
+      true
+    );
+
+
+  try {
+
+    const response =
+      await fetch(
+        specialPath,
+        {
+          cache:
+            "no-store"
+        }
+      );
+
+
+    if (
+      response.ok
+    ) {
+
+      return {
+        exists:
+          true,
+
+        special:
+          true
+      };
+    }
+
+  } catch (error) {
+
+    /*
+      둘 다 없음
+    */
+  }
+
+
+  return {
+    exists:
+      false,
+
+    special:
+      false
+  };
 }
 
 
@@ -738,10 +821,13 @@ function renderLessonButtons(
     );
 
 
-  box.innerHTML = "";
+  box.innerHTML =
+    "";
 
 
-  if (!lessons.length) {
+  if (
+    !lessons.length
+  ) {
 
     box.innerHTML = `
       <div class="launcher-note">
@@ -749,12 +835,13 @@ function renderLessonButtons(
       </div>
     `;
 
+
     return;
   }
 
 
   lessons.forEach(
-    lesson => {
+    item => {
 
       const button =
         document.createElement(
@@ -770,8 +857,15 @@ function renderLessonButtons(
         "launcher-button";
 
 
+      /*
+        _SL.csv 파일이면 학생에게는
+        Special Lesson으로 표시
+      */
+
       button.textContent =
-        `Lesson ${lesson}`;
+        item.special
+          ? "Special Lesson"
+          : `Lesson ${item.lesson}`;
 
 
       button.addEventListener(
@@ -780,7 +874,7 @@ function renderLessonButtons(
 
           openLesson(
             grade,
-            lesson
+            item.lesson
           );
         }
       );
@@ -792,8 +886,7 @@ function renderLessonButtons(
     }
   );
 }
-
-
+  
 /* =========================================================
    OPEN LESSON
    ========================================================= */
