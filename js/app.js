@@ -4759,47 +4759,71 @@ function renderTextSequenceTest(
    ========================================================= */
 
 function parsePhraseData(row) {
+
   const raw =
     row.phrase_distractors.trim();
 
+
   if (!raw) {
+
     return null;
   }
+
 
   const leadingMatch =
     raw.match(/^\/+/);
 
+
   const trailingMatch =
     raw.match(/\/+$/);
+
 
   const leading =
     leadingMatch
       ? leadingMatch[0].length
       : 0;
 
+
   const trailing =
     trailingMatch
       ? trailingMatch[0].length
       : 0;
+
 
   const inner =
     raw
       .replace(/^\/+/, "")
       .replace(/\/+$/, "");
 
+
+  /*
+    오답 선택지 끝의 문장부호는 제거한다.
+  */
+
   const distractors =
-    splitSemicolon(inner);
+    splitSemicolon(inner)
+      .map(
+        text =>
+          text.replace(
+            /[.!?]+$/,
+            ""
+          ).trim()
+      );
+
 
   const chunks =
     getChunks(
       row.english
     );
 
+
   if (
     distractors.length < 3
   ) {
+
     return null;
   }
+
 
   if (
     leading +
@@ -4807,27 +4831,71 @@ function parsePhraseData(row) {
     1 !==
     chunks.length
   ) {
+
     return null;
   }
+
 
   const targetIndex =
     leading;
 
+
   if (
     targetIndex < 0 ||
     targetIndex >=
-    chunks.length
+      chunks.length
   ) {
+
     return null;
   }
 
+
+  const rawTarget =
+    chunks[targetIndex];
+
+
+  /*
+    정답 chunk 끝의 문장부호를 분리한다.
+
+    예:
+    inside the roll!
+      ↓
+    target      = inside the roll
+    punctuation = !
+  */
+
+  const punctuationMatch =
+    rawTarget.match(
+      /([.!?]+)$/
+    );
+
+
+  const punctuation =
+    punctuationMatch
+      ? punctuationMatch[1]
+      : "";
+
+
+  const target =
+    punctuation
+      ? rawTarget
+          .slice(
+            0,
+            -punctuation.length
+          )
+          .trim()
+      : rawTarget;
+
+
   return {
+
     chunks,
 
     targetIndex,
 
-    target:
-      chunks[targetIndex],
+    target,
+
+    punctuation,
 
     distractors
   };
@@ -4843,12 +4911,14 @@ function renderMissingPhraseTest(
   const data =
     parsePhraseData(row);
 
-  const displayChunks =
-    [...data.chunks];
+const displayChunks =
+  [...data.chunks];
 
-  displayChunks[
-    data.targetIndex
-  ] = "_____";
+
+displayChunks[
+  data.targetIndex
+] =
+  `_____${data.punctuation}`;
 
   document
     .getElementById(
