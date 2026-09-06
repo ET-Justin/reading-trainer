@@ -668,6 +668,10 @@ function renderLessonMenu(
   lesson
 ) {
 
+   app.classList.remove(
+    "listen-mode"
+  );
+   
   app.innerHTML =
     "";
 
