@@ -2094,3 +2094,41 @@ body {
 
   box-sizing: border-box;
 }
+
+/* =========================================================
+   LISTEN TO THE TEXT — FALLBACK LINK
+   ========================================================= */
+
+.listen-fallback-link {
+  display: block;
+
+  width: fit-content;
+
+  margin:
+    10px
+    auto
+    0;
+
+  color: #6b7280;
+
+  font-size: 0.82rem;
+  line-height: 1.4;
+
+  text-align: center;
+  text-decoration: none;
+}
+
+.listen-fallback-link:hover {
+  color: #315efb;
+
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+
+  .listen-fallback-link {
+    margin-top: 8px;
+
+    font-size: 0.76rem;
+  }
+}
