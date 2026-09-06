@@ -1377,9 +1377,7 @@ function startReadingPractice(
       1,
 
     queue:
-      shuffleArray([
-        ...eligible
-      ]),
+      [...eligible],
 
     retryQueue:
       [],
@@ -1684,53 +1682,23 @@ function showNextPracticeQuestion(
     false;
 
 
+  /*
+    Reading Practice는 항상
+    한국어 뜻 → 영어 문장 찾기
+  */
+
   practiceState.currentType =
-    choosePracticeQuestionType(
-      row
-    );
+    "KOREAN_TO_ENGLISH";
 
 
-  if (
-    practiceState.currentType ===
-    "ENGLISH_TO_KOREAN"
-  ) {
-
-    renderEnglishToKoreanQuestion(
-      app,
-      row
-    );
-
-  } else {
-
-    renderKoreanToEnglishQuestion(
-      app,
-      row
-    );
-  }
+  renderKoreanToEnglishQuestion(
+    app,
+    row
+  );
 
 
   updatePracticeProgress();
 }
-
-
-/* =========================================================
-   PRACTICE TYPE
-   ========================================================= */
-
-function choosePracticeQuestionType(
-  row
-) {
-
-  return (
-    splitSemicolon(
-      row.korean_distractors
-    ).length >= 3 &&
-    Math.random() < 0.5
-  )
-    ? "ENGLISH_TO_KOREAN"
-    : "KOREAN_TO_ENGLISH";
-}
-
 
 /* =========================================================
    PRACTICE: ENGLISH → KOREAN
@@ -4327,28 +4295,41 @@ function parsePhraseData(
     ];
 
 
-  /*
-    정답 chunk 끝의 . ! ? 는
-    선택지에서 제거하되,
-    문제 문장에서는 빈칸 뒤에 남겨둔다.
-  */
+/*
+  정답 chunk 끝의 문장부호와
+  닫는 따옴표를 함께 분리한다.
 
-  const punctuationMatch =
-    rawTarget.match(
-      /([.!?]+)$/
-    );
+  예:
+  out at sea.”
+    → target = out at sea
+    → punctuation = .”
+
+  No more pictures!”
+    → target = No more pictures
+    → punctuation = !”
+*/
+
+const punctuationMatch =
+  rawTarget.match(
+    /([.!?]+["'”’]*)$/
+  );
 
 
-  const punctuation =
-    punctuationMatch
-      ? punctuationMatch[1]
-      : "";
+const punctuation =
+  punctuationMatch
+    ? punctuationMatch[1]
+    : "";
 
 
-  const target =
-    removeFinalPunctuation(
-      rawTarget
-    );
+const target =
+  punctuation
+    ? rawTarget
+        .slice(
+          0,
+          -punctuation.length
+        )
+        .trim()
+    : rawTarget.trim();
 
 
   return {
