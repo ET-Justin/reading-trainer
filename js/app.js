@@ -1,24 +1,16 @@
 "use strict";
 
-
 /* =========================================================
    CONFIG
    ========================================================= */
 
-const URL_PARAMS =
-  new URLSearchParams(
-    window.location.search
-  );
+const URL_PARAMS = new URLSearchParams(window.location.search);
 
 const GRADE_NUMBER =
-  Number(
-    URL_PARAMS.get("grade")
-  ) || 1;
+  Number(URL_PARAMS.get("grade")) || 1;
 
 const LESSON_NUMBER =
-  Number(
-    URL_PARAMS.get("lesson")
-  ) || 5;
+  Number(URL_PARAMS.get("lesson")) || 5;
 
 const DATA_PATH =
   `data/2022M${GRADE_NUMBER}` +
@@ -26,32 +18,16 @@ const DATA_PATH =
 
 const MAX_PRACTICE_ROUNDS = 3;
 
-
-/*
-  Practice:
-  correct → 1 sec
-  wrong   → 3 sec
-*/
-
 const CORRECT_FEEDBACK_MS = 1000;
 const WRONG_FEEDBACK_MS = 3000;
 
-
-/*
-  Reading Test:
-  20 questions
-  20 seconds per question
-*/
-
 const TEST_QUESTION_COUNT = 20;
 const TEST_TIME_LIMIT_MS = 20000;
-
 
 const FEEDBACK_COLORS = {
   correct: "#237a45",
   wrong: "#8b2f2f"
 };
-
 
 const SOUND_PATHS = {
   correct: "sound/correct.mp3",
@@ -66,19 +42,11 @@ const SOUND_PATHS = {
 
 let currentLesson = null;
 
-
-/* Practice */
-
 let practiceState = null;
-
 let practiceFeedbackTimer = null;
 let roundIntroTimer = null;
 
-
-/* Test */
-
 let testState = null;
-
 let testTimeoutTimer = null;
 let testAnimationFrame = null;
 
@@ -88,71 +56,31 @@ let testAnimationFrame = null;
    ========================================================= */
 
 const sounds = {
-
-  correct:
-    new Audio(
-      SOUND_PATHS.correct
-    ),
-
-  wrong:
-    new Audio(
-      SOUND_PATHS.wrong
-    ),
-
-  victory:
-    new Audio(
-      SOUND_PATHS.victory
-    )
+  correct: new Audio(SOUND_PATHS.correct),
+  wrong: new Audio(SOUND_PATHS.wrong),
+  victory: new Audio(SOUND_PATHS.victory)
 };
 
-
-Object
-  .values(sounds)
-  .forEach(audio => {
-
-    audio.preload =
-      "auto";
-  });
-
+Object.values(sounds).forEach(audio => {
+  audio.preload = "auto";
+});
 
 function playSound(name) {
+  const audio = sounds[name];
 
-  const audio =
-    sounds[name];
-
-
-  if (!audio) {
-    return;
-  }
-
+  if (!audio) return;
 
   try {
-
     audio.pause();
+    audio.currentTime = 0;
 
-    audio.currentTime =
-      0;
+    const promise = audio.play();
 
-
-    const promise =
-      audio.play();
-
-
-    if (
-      promise !== undefined
-    ) {
-
-      promise.catch(
-        () => {}
-      );
+    if (promise !== undefined) {
+      promise.catch(() => {});
     }
-
   } catch (error) {
-
-    console.warn(
-      `Sound error: ${name}`,
-      error
-    );
+    console.warn(`Sound error: ${name}`, error);
   }
 }
 
@@ -163,139 +91,86 @@ function playSound(name) {
 
 initializeReadingTrainer();
 
-
 function initializeReadingTrainer() {
-
   const grade =
-    Number(
-      URL_PARAMS.get("grade")
-    );
+    Number(URL_PARAMS.get("grade"));
 
   const lesson =
-    Number(
-      URL_PARAMS.get("lesson")
-    );
-
+    Number(URL_PARAMS.get("lesson"));
 
   /*
     Grade / Lesson 선택 전에는
-    Reading Trainer 본체 실행 안 함
+    Reading Trainer 본체를 실행하지 않는다.
   */
-
-  if (
-    !grade ||
-    !lesson
-  ) {
-
+  if (!grade || !lesson) {
     console.log(
       "Reading Trainer: waiting for grade and lesson selection."
     );
-
     return;
   }
 
-
   const app =
-    document.getElementById(
-      "app"
-    );
-
+    document.getElementById("app");
 
   if (!app) {
-
     console.error(
       "Reading Trainer: #app element not found."
     );
-
     return;
   }
 
-
-  app.classList.remove(
-    "hidden"
-  );
-
+  app.classList.remove("hidden");
 
   init();
 }
 
-
 async function init() {
-
   const app =
     getAppContainer();
 
-
   try {
-
     showLoading(app);
-
 
     console.log(
       "Reading Trainer starting:",
       {
-        grade:
-          GRADE_NUMBER,
-
-        lesson:
-          LESSON_NUMBER,
-
-        dataPath:
-          DATA_PATH
+        grade: GRADE_NUMBER,
+        lesson: LESSON_NUMBER,
+        dataPath: DATA_PATH
       }
     );
 
-
     const rows =
-      await loadCSV(
-        DATA_PATH
-      );
+      await loadCSV(DATA_PATH);
 
-
-    validateCSV(
-      rows
-    );
-
+    validateCSV(rows);
 
     currentLesson =
-      buildLessonData(
-        rows
-      );
-
+      buildLessonData(rows);
 
     history.replaceState(
       {
         readingTrainer: true,
-        route:
-          getCurrentRoute()
+        route: getCurrentRoute()
       },
       "",
       window.location.href
     );
 
-
     window.addEventListener(
       "popstate",
       () => {
-
-        renderCurrentRoute(
-          app
-        );
+        renderCurrentRoute(app);
       }
     );
 
-
-    renderCurrentRoute(
-      app
-    );
+    renderCurrentRoute(app);
 
   } catch (error) {
-
     console.error(
       "Reading Trainer initialization failed:",
       error
     );
-
 
     renderError(
       app,
@@ -310,29 +185,17 @@ async function init() {
    ========================================================= */
 
 function getAppContainer() {
-
   let app =
-    document.getElementById(
-      "app"
-    );
-
+    document.getElementById("app");
 
   if (!app) {
-
     app =
-      document.createElement(
-        "main"
-      );
+      document.createElement("main");
 
-    app.id =
-      "app";
+    app.id = "app";
 
-
-    document.body.appendChild(
-      app
-    );
+    document.body.appendChild(app);
   }
-
 
   return app;
 }
@@ -343,24 +206,15 @@ function getAppContainer() {
    ========================================================= */
 
 function getCurrentRoute() {
-
-  return window
-    .location
-    .hash
-    .replace(
-      /^#/,
-      ""
-    )
+  return window.location.hash
+    .replace(/^#/, "")
     .trim()
     .toLowerCase();
 }
 
-
 function navigateTo(route) {
-
   clearPracticeTimers();
   clearTestTimers();
-
 
   const url =
     route
@@ -369,7 +223,6 @@ function navigateTo(route) {
           window.location.pathname +
           window.location.search
         );
-
 
   history.pushState(
     {
@@ -380,61 +233,38 @@ function navigateTo(route) {
     url
   );
 
-
   renderCurrentRoute(
-    document.getElementById(
-      "app"
-    )
+    document.getElementById("app")
   );
 }
 
-
 function renderCurrentRoute(app) {
-
   clearPracticeTimers();
   clearTestTimers();
-
 
   const route =
     getCurrentRoute();
 
-
-  if (
-    route === "practice"
-  ) {
-
+  if (route === "practice") {
     startReadingPractice(
       app,
       currentLesson
     );
-
     return;
   }
 
-
-  if (
-    route === "test"
-  ) {
-
-    practiceState =
-      null;
-
+  if (route === "test") {
+    practiceState = null;
 
     renderTestStart(
       app,
       currentLesson
     );
-
     return;
   }
 
-
-  practiceState =
-    null;
-
-  testState =
-    null;
-
+  practiceState = null;
+  testState = null;
 
   renderLessonMenu(
     app,
@@ -442,9 +272,7 @@ function renderCurrentRoute(app) {
   );
 }
 
-
 function goBackToLessonMenu() {
-
   history.back();
 }
 
@@ -454,35 +282,28 @@ function goBackToLessonMenu() {
    ========================================================= */
 
 async function loadCSV(path) {
-
   const response =
     await fetch(
       path,
       {
-        cache:
-          "no-store"
+        cache: "no-store"
       }
     );
 
-
   if (!response.ok) {
-
     throw new Error(
       `CSV 파일을 불러오지 못했습니다. (${response.status})`
     );
   }
 
-
   let text =
     await response.text();
-
 
   text =
     text.replace(
       /^\uFEFF/,
       ""
     );
-
 
   return parseCSV(text);
 }
@@ -493,74 +314,42 @@ async function loadCSV(path) {
    ========================================================= */
 
 function parseCSV(text) {
+  const table = [];
 
-  const table =
-    [];
-
-
-  let row =
-    [];
-
-  let field =
-    "";
-
-  let inQuotes =
-    false;
-
+  let row = [];
+  let field = "";
+  let inQuotes = false;
 
   for (
     let i = 0;
     i < text.length;
     i++
   ) {
+    const char = text[i];
+    const next = text[i + 1];
 
-    const char =
-      text[i];
-
-    const next =
-      text[i + 1];
-
-
-    if (
-      char === '"'
-    ) {
-
+    if (char === '"') {
       if (
         inQuotes &&
         next === '"'
       ) {
-
-        field +=
-          '"';
-
+        field += '"';
         i++;
-
       } else {
-
-        inQuotes =
-          !inQuotes;
+        inQuotes = !inQuotes;
       }
-
 
       continue;
     }
-
 
     if (
       char === "," &&
       !inQuotes
     ) {
-
-      row.push(
-        field
-      );
-
-      field =
-        "";
-
+      row.push(field);
+      field = "";
       continue;
     }
-
 
     if (
       (
@@ -569,82 +358,51 @@ function parseCSV(text) {
       ) &&
       !inQuotes
     ) {
-
       if (
         char === "\r" &&
         next === "\n"
       ) {
-
         i++;
       }
 
-
-      row.push(
-        field
-      );
-
-      field =
-        "";
-
+      row.push(field);
+      field = "";
 
       if (
         row.some(
-          cell =>
-            cell !== ""
+          cell => cell !== ""
         )
       ) {
-
-        table.push(
-          row
-        );
+        table.push(row);
       }
 
-
-      row =
-        [];
-
+      row = [];
       continue;
     }
 
-
-    field +=
-      char;
+    field += char;
   }
-
 
   if (
     field !== "" ||
     row.length > 0
   ) {
-
-    row.push(
-      field
-    );
-
+    row.push(field);
 
     if (
       row.some(
-        cell =>
-          cell !== ""
+        cell => cell !== ""
       )
     ) {
-
-      table.push(
-        row
-      );
+      table.push(row);
     }
   }
 
-
-  if (
-    table.length < 2
-  ) {
-
+  if (table.length < 2) {
     throw new Error(
       "CSV에 데이터가 없습니다."
     );
   }
-
 
   const headers =
     table[0].map(
@@ -652,27 +410,17 @@ function parseCSV(text) {
         header.trim()
     );
 
-
   return table
     .slice(1)
     .map(values => {
-
-      const object =
-        {};
-
+      const object = {};
 
       headers.forEach(
-        (
-          header,
-          index
-        ) => {
-
+        (header, index) => {
           object[header] =
-            values[index] ??
-            "";
+            values[index] ?? "";
         }
       );
-
 
       return object;
     });
@@ -684,7 +432,6 @@ function parseCSV(text) {
    ========================================================= */
 
 function validateCSV(rows) {
-
   const requiredColumns = [
     "id",
     "english",
@@ -694,65 +441,44 @@ function validateCSV(rows) {
     "phrase_distractors"
   ];
 
-
   if (!rows.length) {
-
     throw new Error(
       "CSV에 읽을 데이터가 없습니다."
     );
   }
 
-
   const firstRow =
     rows[0];
-
 
   for (
     const column
     of requiredColumns
   ) {
-
-    if (
-      !(column in firstRow)
-    ) {
-
+    if (!(column in firstRow)) {
       throw new Error(
         `필수 열이 없습니다: ${column}`
       );
     }
   }
 
-
   const ids =
     new Set();
 
-
-  for (
-    const row
-    of rows
-  ) {
-
+  for (const row of rows) {
     const id =
       row.id.trim();
 
-
     if (!id) {
-
       throw new Error(
         "ID가 없는 행이 있습니다."
       );
     }
 
-
-    if (
-      ids.has(id)
-    ) {
-
+    if (ids.has(id)) {
       throw new Error(
         `중복된 ID가 있습니다: ${id}`
       );
     }
-
 
     ids.add(id);
   }
@@ -764,15 +490,11 @@ function validateCSV(rows) {
    ========================================================= */
 
 function buildLessonData(rows) {
-
   const titleRow =
     rows.find(
       row =>
-        row.id.endsWith(
-          "0000"
-        )
+        row.id.endsWith("0000")
     );
-
 
   const title =
     titleRow
@@ -781,18 +503,13 @@ function buildLessonData(rows) {
         )
       : "Reading";
 
-
   const sentences =
     rows.filter(
       row =>
-        isSentenceRow(
-          row
-        )
+        isSentenceRow(row)
     );
 
-
   return {
-
     lessonNumber:
       LESSON_NUMBER,
 
@@ -810,22 +527,15 @@ function buildLessonData(rows) {
    ========================================================= */
 
 function isSentenceRow(row) {
-
   const id =
     row.id.trim();
 
-
-  if (
-    !/^\d{7}$/.test(id)
-  ) {
-
+  if (!/^\d{7}$/.test(id)) {
     return false;
   }
 
-
   return (
-    id.slice(-2) !==
-    "00"
+    id.slice(-2) !== "00"
   );
 }
 
@@ -835,7 +545,6 @@ function isSentenceRow(row) {
    ========================================================= */
 
 function cleanEnglish(text) {
-
   return String(text)
     .replace(
       /\*\*(.*?)\*\*/g,
@@ -852,9 +561,7 @@ function cleanEnglish(text) {
     .trim();
 }
 
-
 function cleanInlineMetadata(text) {
-
   return String(text)
     .replace(
       /\*\*(.*?)\*\*/g,
@@ -875,26 +582,20 @@ function renderLessonMenu(
   app,
   lesson
 ) {
-
-  app.innerHTML =
-    "";
-
+  app.innerHTML = "";
 
   const section =
     document.createElement(
       "section"
     );
 
-
   section.className =
     "lesson-menu";
-
 
   const heading =
     document.createElement(
       "h1"
     );
-
 
   heading.className =
     "lesson-heading";
@@ -902,12 +603,10 @@ function renderLessonMenu(
   heading.textContent =
     `Lesson ${lesson.lessonNumber}. Reading`;
 
-
   const title =
     document.createElement(
       "div"
     );
-
 
   title.className =
     "reading-title";
@@ -915,16 +614,13 @@ function renderLessonMenu(
   title.textContent =
     `<${lesson.title}>`;
 
-
   const buttons =
     document.createElement(
       "div"
     );
 
-
   buttons.className =
     "lesson-buttons";
-
 
   const practiceButton =
     createButton(
@@ -932,54 +628,39 @@ function renderLessonMenu(
       "practice-button"
     );
 
-
   const testButton =
     createButton(
       "📝 Reading Test",
       "test-button"
     );
 
-
   practiceButton.addEventListener(
     "click",
     () => {
-
-      navigateTo(
-        "practice"
-      );
+      navigateTo("practice");
     }
   );
-
 
   testButton.addEventListener(
     "click",
     () => {
-
-      navigateTo(
-        "test"
-      );
+      navigateTo("test");
     }
   );
-
 
   buttons.append(
     practiceButton,
     testButton
   );
 
-
   const info =
-    document.createElement(
-      "p"
-    );
-
+    document.createElement("p");
 
   info.className =
     "data-status";
 
   info.textContent =
     `${lesson.sentences.length} sentences loaded`;
-
 
   section.append(
     heading,
@@ -988,10 +669,7 @@ function renderLessonMenu(
     info
   );
 
-
-  app.appendChild(
-    section
-  );
+  app.appendChild(section);
 }
 
 
@@ -1003,22 +681,14 @@ function createButton(
   label,
   className
 ) {
-
   const button =
     document.createElement(
       "button"
     );
 
-
-  button.type =
-    "button";
-
-  button.className =
-    className;
-
-  button.textContent =
-    label;
-
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
 
   return button;
 }
@@ -1033,26 +703,17 @@ function showFeedback(
   message,
   type
 ) {
-
-  if (!element) {
-    return;
-  }
-
+  if (!element) return;
 
   element.textContent =
     message;
-
 
   element.classList.remove(
     "feedback-correct",
     "feedback-wrong"
   );
 
-
-  if (
-    type === "correct"
-  ) {
-
+  if (type === "correct") {
     element.classList.add(
       "feedback-correct"
     );
@@ -1061,7 +722,6 @@ function showFeedback(
       FEEDBACK_COLORS.correct;
 
   } else {
-
     element.classList.add(
       "feedback-wrong"
     );
@@ -1078,7 +738,6 @@ function showFeedback(
    =========================================================
    ========================================================= */
 
-
 /* =========================================================
    PRACTICE START
    ========================================================= */
@@ -1087,9 +746,7 @@ function startReadingPractice(
   app,
   lesson
 ) {
-
   clearPracticeTimers();
-
 
   const eligible =
     lesson.sentences.filter(
@@ -1100,32 +757,25 @@ function startReadingPractice(
         row.korean.trim()
     );
 
-
   if (!eligible.length) {
-
     renderError(
       app,
       new Error(
         "Reading Practice에 사용할 문장이 없습니다."
       )
     );
-
     return;
   }
 
-
   practiceState = {
-
-    round:
-      1,
+    round: 1,
 
     queue:
       shuffleArray([
         ...eligible
       ]),
 
-    retryQueue:
-      [],
+    retryQueue: [],
 
     allSentences:
       [...eligible],
@@ -1136,29 +786,20 @@ function startReadingPractice(
     roundTotal:
       eligible.length,
 
-    roundAnswered:
-      0,
+    roundAnswered: 0,
 
-    currentRow:
-      null,
+    currentRow: null,
 
-    currentType:
-      null,
+    currentType: null,
 
-    correctCount:
-      0,
+    correctCount: 0,
 
-    wrongCount:
-      0,
+    wrongCount: 0,
 
-    locked:
-      false
+    locked: false
   };
 
-
-  showPracticeRoundIntro(
-    app
-  );
+  showPracticeRoundIntro(app);
 }
 
 
@@ -1166,31 +807,21 @@ function startReadingPractice(
    PRACTICE ROUND INTRO
    ========================================================= */
 
-function showPracticeRoundIntro(
-  app
-) {
-
-  if (!practiceState) {
-    return;
-  }
-
+function showPracticeRoundIntro(app) {
+  if (!practiceState) return;
 
   clearPracticeTimers();
-
 
   const round =
     practiceState.round;
 
-
   const total =
     practiceState.roundTotal;
-
 
   const purpose =
     round === 1
       ? "to learn"
       : "to review";
-
 
   app.innerHTML = `
     <section class="practice-round-intro">
@@ -1219,12 +850,10 @@ function showPracticeRoundIntro(
     </section>
   `;
 
-
   const countdown =
     document.getElementById(
       "roundCountdown"
     );
-
 
   const sequence = [
     "3",
@@ -1233,30 +862,22 @@ function showPracticeRoundIntro(
     "Start!"
   ];
 
-
-  let index =
-    0;
-
+  let index = 0;
 
   function nextCount() {
-
     if (!practiceState) {
       return;
     }
 
-
     countdown.textContent =
       sequence[index];
 
-
     index++;
-
 
     if (
       index <
       sequence.length
     ) {
-
       roundIntroTimer =
         setTimeout(
           nextCount,
@@ -1264,31 +885,20 @@ function showPracticeRoundIntro(
         );
 
     } else {
-
       roundIntroTimer =
         setTimeout(
           () => {
-
             if (!practiceState) {
               return;
             }
 
-
-            renderPracticeScreen(
-              app
-            );
-
-
-            showNextPracticeQuestion(
-              app
-            );
-
+            renderPracticeScreen(app);
+            showNextPracticeQuestion(app);
           },
           1000
         );
     }
   }
-
 
   nextCount();
 }
@@ -1298,10 +908,7 @@ function showPracticeRoundIntro(
    PRACTICE SCREEN
    ========================================================= */
 
-function renderPracticeScreen(
-  app
-) {
-
+function renderPracticeScreen(app) {
   app.innerHTML = `
     <section class="practice-screen">
 
@@ -1323,12 +930,10 @@ function renderPracticeScreen(
           </div>
 
           <div class="practice-progress-bar">
-
             <div
               class="practice-progress-fill"
               id="practiceProgressFill"
             ></div>
-
           </div>
 
         </div>
@@ -1362,7 +967,6 @@ function renderPracticeScreen(
     </section>
   `;
 
-
   document
     .getElementById(
       "practiceBackButton"
@@ -1372,7 +976,6 @@ function renderPracticeScreen(
       goBackToLessonMenu
     );
 
-
   updatePracticeProgress();
 }
 
@@ -1381,31 +984,18 @@ function renderPracticeScreen(
    PRACTICE NEXT QUESTION
    ========================================================= */
 
-function showNextPracticeQuestion(
-  app
-) {
-
-  if (!practiceState) {
-    return;
-  }
-
+function showNextPracticeQuestion(app) {
+  if (!practiceState) return;
 
   if (
-    practiceState.queue.length ===
-    0
+    practiceState.queue.length === 0
   ) {
-
-    handlePracticeRoundEnd(
-      app
-    );
-
+    handlePracticeRoundEnd(app);
     return;
   }
-
 
   const row =
     practiceState.queue.shift();
-
 
   practiceState.currentRow =
     row;
@@ -1413,35 +1003,26 @@ function showNextPracticeQuestion(
   practiceState.locked =
     false;
 
-
   const type =
-    choosePracticeQuestionType(
-      row
-    );
-
+    choosePracticeQuestionType(row);
 
   practiceState.currentType =
     type;
 
-
   if (
-    type ===
-    "ENGLISH_TO_KOREAN"
+    type === "ENGLISH_TO_KOREAN"
   ) {
-
     renderEnglishToKoreanQuestion(
       app,
       row
     );
 
   } else {
-
     renderKoreanToEnglishQuestion(
       app,
       row
     );
   }
-
 
   updatePracticeProgress();
 }
@@ -1451,28 +1032,21 @@ function showNextPracticeQuestion(
    PRACTICE TYPE
    ========================================================= */
 
-function choosePracticeQuestionType(
-  row
-) {
-
+function choosePracticeQuestionType(row) {
   const koreanDistractors =
     splitSemicolon(
       row.korean_distractors
     );
 
-
   if (
-    koreanDistractors.length >=
-    3
+    koreanDistractors.length >= 3
   ) {
-
     return (
       Math.random() < 0.5
         ? "ENGLISH_TO_KOREAN"
         : "KOREAN_TO_ENGLISH"
     );
   }
-
 
   return "KOREAN_TO_ENGLISH";
 }
@@ -1486,59 +1060,46 @@ function renderEnglishToKoreanQuestion(
   app,
   row
 ) {
-
   const label =
     document.getElementById(
       "practiceLabel"
     );
-
 
   const question =
     document.getElementById(
       "practiceQuestion"
     );
 
-
   label.textContent =
     "Choose the correct meaning.";
-
 
   question.textContent =
     cleanEnglish(
       row.english
     );
 
-
   const distractors =
     shuffleArray(
       splitSemicolon(
         row.korean_distractors
       )
-    ).slice(
-      0,
-      3
-    );
-
+    ).slice(0, 3);
 
   const options =
     shuffleArray([
       {
         text:
           row.korean.trim(),
-
-        correct:
-          true
+        correct: true
       },
 
       ...distractors.map(
         text => ({
           text,
-          correct:
-            false
+          correct: false
         })
       )
     ]);
-
 
   renderPracticeOptions(
     app,
@@ -1555,26 +1116,21 @@ function renderKoreanToEnglishQuestion(
   app,
   row
 ) {
-
   const label =
     document.getElementById(
       "practiceLabel"
     );
-
 
   const question =
     document.getElementById(
       "practiceQuestion"
     );
 
-
   label.textContent =
     "Choose the correct English sentence.";
 
-
   question.textContent =
     row.korean.trim();
-
 
   const distractorRows =
     getEnglishDistractorRows(
@@ -1583,7 +1139,6 @@ function renderKoreanToEnglishQuestion(
       3
     );
 
-
   const options =
     shuffleArray([
       {
@@ -1591,9 +1146,7 @@ function renderKoreanToEnglishQuestion(
           cleanEnglish(
             row.english
           ),
-
-        correct:
-          true
+        correct: true
       },
 
       ...distractorRows.map(
@@ -1602,13 +1155,10 @@ function renderKoreanToEnglishQuestion(
             cleanEnglish(
               distractorRow.english
             ),
-
-          correct:
-            false
+          correct: false
         })
       )
     ]);
-
 
   renderPracticeOptions(
     app,
@@ -1626,14 +1176,12 @@ function getEnglishDistractorRows(
   allRows,
   count
 ) {
-
   const correctWordCount =
     countWords(
       cleanEnglish(
         correctRow.english
       )
     );
-
 
   const otherRows =
     allRows.filter(
@@ -1642,51 +1190,40 @@ function getEnglishDistractorRows(
         correctRow.id
     );
 
-
   const closeRows =
-    otherRows.filter(
-      row => {
-
-        const candidateCount =
-          countWords(
-            cleanEnglish(
-              row.english
-            )
-          );
-
-
-        return (
-          Math.abs(
-            candidateCount -
-            correctWordCount
-          ) <= 5
+    otherRows.filter(row => {
+      const candidateCount =
+        countWords(
+          cleanEnglish(
+            row.english
+          )
         );
-      }
-    );
 
+      return (
+        Math.abs(
+          candidateCount -
+          correctWordCount
+        ) <= 5
+      );
+    });
 
   const selected =
-    shuffleArray([
-      ...closeRows
-    ]).slice(
+    shuffleArray(
+      [...closeRows]
+    ).slice(
       0,
       count
     );
 
-
   if (
-    selected.length <
-    count
+    selected.length < count
   ) {
-
     const selectedIds =
       new Set(
         selected.map(
-          row =>
-            row.id
+          row => row.id
         )
       );
-
 
     const remaining =
       otherRows.filter(
@@ -1696,18 +1233,16 @@ function getEnglishDistractorRows(
           )
       );
 
-
     selected.push(
-      ...shuffleArray([
-        ...remaining
-      ]).slice(
+      ...shuffleArray(
+        [...remaining]
+      ).slice(
         0,
         count -
         selected.length
       )
     );
   }
-
 
   return selected;
 }
@@ -1721,65 +1256,49 @@ function renderPracticeOptions(
   app,
   options
 ) {
-
   const container =
     document.getElementById(
       "practiceOptions"
     );
-
 
   const feedback =
     document.getElementById(
       "practiceFeedback"
     );
 
+  container.innerHTML = "";
+  feedback.textContent = "";
 
-  container.innerHTML =
-    "";
+  options.forEach(option => {
+    const button =
+      document.createElement(
+        "button"
+      );
 
-  feedback.textContent =
-    "";
+    button.type =
+      "button";
 
+    button.className =
+      "practice-option";
 
-  options.forEach(
-    option => {
+    button.textContent =
+      option.text;
 
-      const button =
-        document.createElement(
-          "button"
+    button.addEventListener(
+      "click",
+      () => {
+        handlePracticeAnswer(
+          app,
+          button,
+          option
         );
+      }
+    );
 
-
-      button.type =
-        "button";
-
-
-      button.className =
-        "practice-option";
-
-
-      button.textContent =
-        option.text;
-
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          handlePracticeAnswer(
-            app,
-            button,
-            option
-          );
-        }
-      );
-
-
-      container.appendChild(
-        button
-      );
-    }
-  );
+    container.appendChild(
+      button
+    );
+  });
 }
 
 
@@ -1792,22 +1311,15 @@ function handlePracticeAnswer(
   clickedButton,
   selectedOption
 ) {
-
   if (
     !practiceState ||
     practiceState.locked
   ) {
-
     return;
   }
 
-
-  practiceState.locked =
-    true;
-
-
+  practiceState.locked = true;
   practiceState.roundAnswered++;
-
 
   const buttons = [
     ...document.querySelectorAll(
@@ -1815,24 +1327,17 @@ function handlePracticeAnswer(
     )
   ];
 
-
   const feedback =
     document.getElementById(
       "practiceFeedback"
     );
 
-
-  if (
-    selectedOption.correct
-  ) {
-
+  if (selectedOption.correct) {
     practiceState.correctCount++;
-
 
     clickedButton.classList.add(
       "correct"
     );
-
 
     showFeedback(
       feedback,
@@ -1840,27 +1345,17 @@ function handlePracticeAnswer(
       "correct"
     );
 
+    playSound("correct");
 
-    playSound(
-      "correct"
-    );
-
-
-    disableButtons(
-      buttons
-    );
-
+    disableButtons(buttons);
 
     clickedButton.blur();
 
-
     updatePracticeProgress();
-
 
     practiceFeedbackTimer =
       setTimeout(
         () => {
-
           showNextPracticeQuestion(
             app
           );
@@ -1868,27 +1363,21 @@ function handlePracticeAnswer(
         CORRECT_FEEDBACK_MS
       );
 
-
     return;
   }
 
-
   practiceState.wrongCount++;
-
 
   clickedButton.classList.add(
     "wrong"
   );
 
-
   const correctText =
     practiceState.currentType ===
     "ENGLISH_TO_KOREAN"
 
-      ? practiceState
-          .currentRow
-          .korean
-          .trim()
+      ? practiceState.currentRow
+          .korean.trim()
 
       : cleanEnglish(
           practiceState
@@ -1896,29 +1385,22 @@ function handlePracticeAnswer(
             .english
         );
 
-
   const correctButton =
     buttons.find(
       button =>
-        button
-          .textContent
-          .trim() ===
+        button.textContent.trim() ===
         correctText
     );
 
-
   if (correctButton) {
-
     correctButton.classList.add(
       "correct"
     );
   }
 
-
   practiceState.retryQueue.push(
     practiceState.currentRow
   );
-
 
   showFeedback(
     feedback,
@@ -1926,27 +1408,17 @@ function handlePracticeAnswer(
     "wrong"
   );
 
+  playSound("wrong");
 
-  playSound(
-    "wrong"
-  );
-
-
-  disableButtons(
-    buttons
-  );
-
+  disableButtons(buttons);
 
   clickedButton.blur();
 
-
   updatePracticeProgress();
-
 
   practiceFeedbackTimer =
     setTimeout(
       () => {
-
         showNextPracticeQuestion(
           app
         );
@@ -1960,69 +1432,43 @@ function handlePracticeAnswer(
    PRACTICE ROUND END
    ========================================================= */
 
-function handlePracticeRoundEnd(
-  app
-) {
-
-  if (!practiceState) {
-    return;
-  }
-
+function handlePracticeRoundEnd(app) {
+  if (!practiceState) return;
 
   const missedRows =
     practiceState.retryQueue;
 
-
   if (
-    missedRows.length ===
-    0
+    missedRows.length === 0
   ) {
-
-    renderPracticeResult(
-      app
-    );
-
+    renderPracticeResult(app);
     return;
   }
-
 
   if (
     practiceState.round >=
     MAX_PRACTICE_ROUNDS
   ) {
-
-    renderPracticeResult(
-      app
-    );
-
+    renderPracticeResult(app);
     return;
   }
 
-
   practiceState.round++;
-
 
   practiceState.queue =
     shuffleArray([
       ...missedRows
     ]);
 
-
   practiceState.roundTotal =
     practiceState.queue.length;
-
 
   practiceState.roundAnswered =
     0;
 
+  practiceState.retryQueue = [];
 
-  practiceState.retryQueue =
-    [];
-
-
-  showPracticeRoundIntro(
-    app
-  );
+  showPracticeRoundIntro(app);
 }
 
 
@@ -2031,69 +1477,52 @@ function handlePracticeRoundEnd(
    ========================================================= */
 
 function updatePracticeProgress() {
-
-  if (!practiceState) {
-    return;
-  }
-
+  if (!practiceState) return;
 
   const roundText =
     document.getElementById(
       "practiceRoundText"
     );
 
-
   const countText =
     document.getElementById(
       "practiceCountText"
     );
-
 
   const fill =
     document.getElementById(
       "practiceProgressFill"
     );
 
-
   if (
     !roundText ||
     !countText ||
     !fill
   ) {
-
     return;
   }
-
 
   const completed =
     practiceState.roundAnswered;
 
-
   const total =
     practiceState.roundTotal;
 
-
   const percent =
     total > 0
-
       ? Math.min(
-          (
-            completed /
-            total
-          ) * 100,
+          completed /
+          total *
+          100,
           100
         )
-
       : 0;
-
 
   roundText.textContent =
     `Round ${practiceState.round}`;
 
-
   countText.textContent =
     `${completed} / ${total}`;
-
 
   fill.style.width =
     `${percent}%`;
@@ -2104,12 +1533,8 @@ function updatePracticeProgress() {
    PRACTICE RESULT
    ========================================================= */
 
-function renderPracticeResult(
-  app
-) {
-
+function renderPracticeResult(app) {
   clearPracticeTimers();
-
 
   const unresolved =
     practiceState
@@ -2118,15 +1543,10 @@ function renderPracticeResult(
           .length
       : 0;
 
-
   const allMastered =
     unresolved === 0;
 
-
-  playSound(
-    "victory"
-  );
-
+  playSound("victory");
 
   app.innerHTML = `
     <section class="practice-result">
@@ -2142,7 +1562,6 @@ function renderPracticeResult(
         </h1>
 
         <p class="result-message">
-
           ${
             allMastered
 
@@ -2156,33 +1575,22 @@ function renderPracticeResult(
                  }
                  and try again.`
           }
-
         </p>
 
         <div class="result-stats">
 
           <div>
-
             <strong>
               ${practiceState.correctCount}
             </strong>
-
-            <span>
-              Correct
-            </span>
-
+            <span>Correct</span>
           </div>
 
           <div>
-
             <strong>
               ${practiceState.wrongCount}
             </strong>
-
-            <span>
-              Wrong
-            </span>
-
+            <span>Wrong</span>
           </div>
 
         </div>
@@ -2210,7 +1618,6 @@ function renderPracticeResult(
     </section>
   `;
 
-
   document
     .getElementById(
       "practiceAgainButton"
@@ -2218,14 +1625,12 @@ function renderPracticeResult(
     .addEventListener(
       "click",
       () => {
-
         startReadingPractice(
           app,
           currentLesson
         );
       }
     );
-
 
   document
     .getElementById(
@@ -2243,30 +1648,20 @@ function renderPracticeResult(
    ========================================================= */
 
 function clearPracticeTimers() {
-
-  if (
-    practiceFeedbackTimer
-  ) {
-
+  if (practiceFeedbackTimer) {
     clearTimeout(
       practiceFeedbackTimer
     );
 
-    practiceFeedbackTimer =
-      null;
+    practiceFeedbackTimer = null;
   }
 
-
-  if (
-    roundIntroTimer
-  ) {
-
+  if (roundIntroTimer) {
     clearTimeout(
       roundIntroTimer
     );
 
-    roundIntroTimer =
-      null;
+    roundIntroTimer = null;
   }
 }
 
@@ -2277,7 +1672,6 @@ function clearPracticeTimers() {
    =========================================================
    ========================================================= */
 
-
 /* =========================================================
    TEST START SCREEN
    ========================================================= */
@@ -2286,10 +1680,7 @@ function renderTestStart(
   app,
   lesson
 ) {
-
-  testState =
-    null;
-
+  testState = null;
 
   app.innerHTML = `
     <section class="test-start">
@@ -2341,7 +1732,6 @@ function renderTestStart(
     </section>
   `;
 
-
   document
     .getElementById(
       "testStartBackButton"
@@ -2351,7 +1741,6 @@ function renderTestStart(
       goBackToLessonMenu
     );
 
-
   document
     .getElementById(
       "testStartButton"
@@ -2359,7 +1748,6 @@ function renderTestStart(
     .addEventListener(
       "click",
       () => {
-
         startReadingTest(
           app,
           lesson
@@ -2377,61 +1765,43 @@ function startReadingTest(
   app,
   lesson
 ) {
-
   clearTestTimers();
-
 
   const questions =
     buildTestQuestions(
       lesson
     );
 
-
   if (
     questions.length <
     TEST_QUESTION_COUNT
   ) {
-
     renderError(
       app,
       new Error(
         `Reading Test 문항을 ${TEST_QUESTION_COUNT}개 만들 수 없습니다. 현재 ${questions.length}개입니다.`
       )
     );
-
     return;
   }
 
-
   testState = {
-
     questions,
 
-    currentIndex:
-      0,
+    currentIndex: 0,
 
-    score:
-      0,
+    score: 0,
 
-    locked:
-      false,
+    locked: false,
 
-    reviewSentences:
-      [],
+    reviewSentences: [],
 
-    currentReveal:
-      null
+    currentReveal: null
   };
 
+  renderTestScreen(app);
 
-  renderTestScreen(
-    app
-  );
-
-
-  showNextTestQuestion(
-    app
-  );
+  showNextTestQuestion(app);
 }
 
 
@@ -2439,12 +1809,8 @@ function startReadingTest(
    TEST QUESTION BANK
    ========================================================= */
 
-function buildTestQuestions(
-  lesson
-) {
-
+function buildTestQuestions(lesson) {
   const banks = {
-
     RANDOM_BLANK:
       buildRandomBlankBank(
         lesson
@@ -2471,22 +1837,15 @@ function buildTestQuestions(
       )
   };
 
+  const targetPerType = 4;
 
-  const targetPerType =
-    4;
-
-
-  const selected =
-    [];
-
+  const selected = [];
 
   const usedIds =
     new Set();
 
-
   const usedQuestionKeys =
     new Set();
-
 
   const typeOrder = [
     "FIND_ERROR",
@@ -2496,22 +1855,18 @@ function buildTestQuestions(
     "RANDOM_BLANK"
   ];
 
-
   /*
     우선 5유형 × 4문항
   */
-
   for (
     const type
     of typeOrder
   ) {
-
     for (
       let i = 0;
       i < targetPerType;
       i++
     ) {
-
       const candidate =
         chooseTestCandidate(
           banks[type],
@@ -2519,21 +1874,17 @@ function buildTestQuestions(
           usedQuestionKeys
         );
 
-
       if (!candidate) {
         break;
       }
-
 
       selected.push(
         candidate
       );
 
-
       usedQuestionKeys.add(
         candidate.key
       );
-
 
       candidate.ids.forEach(
         id =>
@@ -2542,26 +1893,20 @@ function buildTestQuestions(
     }
   }
 
-
   /*
-    부족한 유형이 있으면
-    다른 유형에서 보충
+    특정 유형이 부족하면
+    다른 유형으로 보충
   */
-
   while (
     selected.length <
     TEST_QUESTION_COUNT
   ) {
-
-    let added =
-      false;
-
+    let added = false;
 
     for (
       const type
       of typeOrder
     ) {
-
       const candidate =
         chooseTestCandidate(
           banks[type],
@@ -2569,49 +1914,38 @@ function buildTestQuestions(
           usedQuestionKeys
         );
 
-
       if (!candidate) {
         continue;
       }
-
 
       selected.push(
         candidate
       );
 
-
       usedQuestionKeys.add(
         candidate.key
       );
-
 
       candidate.ids.forEach(
         id =>
           usedIds.add(id)
       );
 
-
-      added =
-        true;
-
+      added = true;
 
       if (
         selected.length >=
         TEST_QUESTION_COUNT
       ) {
-
         break;
       }
     }
 
-
     if (!added) {
-
       for (
         const type
         of typeOrder
       ) {
-
         const remaining =
           banks[type].filter(
             item =>
@@ -2620,48 +1954,38 @@ function buildTestQuestions(
               )
           );
 
-
         if (!remaining.length) {
           continue;
         }
-
 
         const candidate =
           randomChoice(
             remaining
           );
 
-
         selected.push(
           candidate
         );
-
 
         usedQuestionKeys.add(
           candidate.key
         );
 
-
-        added =
-          true;
-
+        added = true;
 
         if (
           selected.length >=
           TEST_QUESTION_COUNT
         ) {
-
           break;
         }
       }
     }
 
-
     if (!added) {
       break;
     }
   }
-
 
   return shuffleArray(
     selected.slice(
@@ -2681,7 +2005,6 @@ function chooseTestCandidate(
   usedIds,
   usedKeys
 ) {
-
   const available =
     bank.filter(
       item =>
@@ -2690,12 +2013,9 @@ function chooseTestCandidate(
         )
     );
 
-
   if (!available.length) {
-
     return null;
   }
-
 
   const fresh =
     available.filter(
@@ -2706,14 +2026,11 @@ function chooseTestCandidate(
         )
     );
 
-
   if (fresh.length) {
-
     return randomChoice(
       fresh
     );
   }
-
 
   return randomChoice(
     available
@@ -2728,31 +2045,27 @@ function chooseTestCandidate(
 function buildRandomBlankBank(
   lesson
 ) {
-
   return lesson.sentences
-
-    .filter(
-      row =>
+    .filter(row => {
+      return (
         getBlankCandidates(
           row.english
         ).length > 0 &&
         row.korean.trim()
-    )
+      );
+    })
+    .map(row => ({
+      type:
+        "RANDOM_BLANK",
 
-    .map(
-      row => ({
-        type:
-          "RANDOM_BLANK",
+      key:
+        `blank-${row.id}`,
 
-        key:
-          `blank-${row.id}`,
+      ids:
+        [row.id],
 
-        ids:
-          [row.id],
-
-        row
-      })
-    );
+      row
+    }));
 }
 
 
@@ -2763,39 +2076,30 @@ function buildRandomBlankBank(
 function buildSentenceOrderingBank(
   lesson
 ) {
-
   return lesson.sentences
-
-    .filter(
-      row => {
-
-        const chunks =
-          getChunks(
-            row.english
-          );
-
-
-        return (
-          chunks.length >= 2 &&
-          row.korean.trim()
+    .filter(row => {
+      const chunks =
+        getChunks(
+          row.english
         );
-      }
-    )
 
-    .map(
-      row => ({
-        type:
-          "SENTENCE_ORDERING",
+      return (
+        chunks.length >= 2 &&
+        row.korean.trim()
+      );
+    })
+    .map(row => ({
+      type:
+        "SENTENCE_ORDERING",
 
-        key:
-          `ordering-${row.id}`,
+      key:
+        `ordering-${row.id}`,
 
-        ids:
-          [row.id],
+      ids:
+        [row.id],
 
-        row
-      })
-    );
+      row
+    }));
 }
 
 
@@ -2806,45 +2110,35 @@ function buildSentenceOrderingBank(
 function buildFindErrorBank(
   lesson
 ) {
-
   return lesson.sentences
-
-    .filter(
-      row => {
-
-        const spans =
-          extractErrorSpans(
-            row.english
-          );
-
-
-        const choices =
-          splitSemicolon(
-            row.error_choices
-          );
-
-
-        return (
-          spans.length === 4 &&
-          choices.length === 4
+    .filter(row => {
+      const spans =
+        extractErrorSpans(
+          row.english
         );
-      }
-    )
 
-    .map(
-      row => ({
-        type:
-          "FIND_ERROR",
+      const choices =
+        splitSemicolon(
+          row.error_choices
+        );
 
-        key:
-          `error-${row.id}`,
+      return (
+        spans.length === 4 &&
+        choices.length === 4
+      );
+    })
+    .map(row => ({
+      type:
+        "FIND_ERROR",
 
-        ids:
-          [row.id],
+      key:
+        `error-${row.id}`,
 
-        row
-      })
-    );
+      ids:
+        [row.id],
+
+      row
+    }));
 }
 
 
@@ -2855,32 +2149,24 @@ function buildFindErrorBank(
 function buildMissingPhraseBank(
   lesson
 ) {
-
   return lesson.sentences
+    .filter(row => {
+      return Boolean(
+        parsePhraseData(row)
+      );
+    })
+    .map(row => ({
+      type:
+        "MISSING_PHRASE",
 
-    .filter(
-      row =>
-        Boolean(
-          parsePhraseData(
-            row
-          )
-        )
-    )
+      key:
+        `phrase-${row.id}`,
 
-    .map(
-      row => ({
-        type:
-          "MISSING_PHRASE",
+      ids:
+        [row.id],
 
-        key:
-          `phrase-${row.id}`,
-
-        ids:
-          [row.id],
-
-        row
-      })
-    );
+      row
+    }));
 }
 
 
@@ -2891,61 +2177,41 @@ function buildMissingPhraseBank(
 function buildTextSequenceBank(
   lesson
 ) {
-
   const groups =
     new Map();
 
-
   lesson.sentences.forEach(
     row => {
-
       const paragraphKey =
-        row.id.slice(
-          0,
-          5
-        );
-
+        row.id.slice(0, 5);
 
       if (
         !groups.has(
           paragraphKey
         )
       ) {
-
         groups.set(
           paragraphKey,
           []
         );
       }
 
-
       groups
-        .get(
-          paragraphKey
-        )
-        .push(
-          row
-        );
+        .get(paragraphKey)
+        .push(row);
     }
   );
 
-
-  const windows =
-    [];
-
+  const windows = [];
 
   groups.forEach(
     (
       rows,
       paragraphKey
     ) => {
-
       const sorted =
         [...rows].sort(
-          (
-            a,
-            b
-          ) =>
+          (a, b) =>
             Number(
               a.id.slice(-2)
             ) -
@@ -2954,20 +2220,17 @@ function buildTextSequenceBank(
             )
         );
 
-
       for (
         let i = 0;
         i <=
         sorted.length - 4;
         i++
       ) {
-
         const group =
           sorted.slice(
             i,
             i + 4
           );
-
 
         const numbers =
           group.map(
@@ -2977,21 +2240,15 @@ function buildTextSequenceBank(
               )
           );
 
-
         const consecutive =
           numbers.every(
             (
               number,
               index
             ) => {
-
-              if (
-                index === 0
-              ) {
-
+              if (index === 0) {
                 return true;
               }
-
 
               return (
                 number ===
@@ -3001,26 +2258,18 @@ function buildTextSequenceBank(
             }
           );
 
-
         if (!consecutive) {
-
           continue;
         }
 
-
         windows.push({
-
           type:
             "TEXT_SEQUENCE",
 
           key:
-            `sequence-${
-              group
-                .map(
-                  row => row.id
-                )
-                .join("-")
-            }`,
+            `sequence-${group
+              .map(row => row.id)
+              .join("-")}`,
 
           ids:
             group.map(
@@ -3036,7 +2285,6 @@ function buildTextSequenceBank(
     }
   );
 
-
   return windows;
 }
 
@@ -3045,10 +2293,7 @@ function buildTextSequenceBank(
    TEST SCREEN
    ========================================================= */
 
-function renderTestScreen(
-  app
-) {
-
+function renderTestScreen(app) {
   app.innerHTML = `
     <section class="test-screen">
 
@@ -3065,7 +2310,6 @@ function renderTestScreen(
         <div class="test-progress-wrap">
 
           <div class="test-progress-text">
-
             <span>
               Reading Test
             </span>
@@ -3073,16 +2317,13 @@ function renderTestScreen(
             <span
               id="testQuestionNumber"
             ></span>
-
           </div>
 
           <div class="test-time-bar">
-
             <div
               class="test-time-fill"
               id="testTimeFill"
             ></div>
-
           </div>
 
         </div>
@@ -3129,7 +2370,6 @@ function renderTestScreen(
     </section>
   `;
 
-
   document
     .getElementById(
       "testBackButton"
@@ -3139,7 +2379,6 @@ function renderTestScreen(
       goBackToLessonMenu
     );
 
-
   document
     .getElementById(
       "testNextButton"
@@ -3147,10 +2386,7 @@ function renderTestScreen(
     .addEventListener(
       "click",
       () => {
-
-        advanceTestQuestion(
-          app
-        );
+        advanceTestQuestion(app);
       }
     );
 }
@@ -3160,109 +2396,68 @@ function renderTestScreen(
    NEXT TEST QUESTION
    ========================================================= */
 
-function showNextTestQuestion(
-  app
-) {
-
-  if (!testState) {
-    return;
-  }
-
+function showNextTestQuestion(app) {
+  if (!testState) return;
 
   clearTestTimers();
-
 
   if (
     testState.currentIndex >=
     testState.questions.length
   ) {
-
-    renderTestResult(
-      app
-    );
-
+    renderTestResult(app);
     return;
   }
 
+  testState.locked = false;
+  testState.currentReveal = null;
 
-  testState.locked =
-    false;
-
-
-  testState.currentReveal =
-    null;
-
-
-  const item =
+  const question =
     testState.questions[
       testState.currentIndex
     ];
 
-
   updateTestQuestionNumber();
-
-
   clearTestQuestionArea();
 
-
-  switch (
-    item.type
-  ) {
-
+  switch (question.type) {
     case "RANDOM_BLANK":
-
       renderRandomBlankTest(
         app,
-        item
+        question
       );
-
       break;
-
 
     case "SENTENCE_ORDERING":
-
       renderSentenceOrderingTest(
         app,
-        item
+        question
       );
-
       break;
-
 
     case "FIND_ERROR":
-
       renderFindErrorTest(
         app,
-        item
+        question
       );
-
       break;
-
 
     case "TEXT_SEQUENCE":
-
       renderTextSequenceTest(
         app,
-        item
+        question
       );
-
       break;
 
-
     case "MISSING_PHRASE":
-
       renderMissingPhraseTest(
         app,
-        item
+        question
       );
-
       break;
   }
 
-
-  startTestTimer(
-    app
-  );
+  startTestTimer(app);
 }
 
 
@@ -3271,17 +2466,12 @@ function showNextTestQuestion(
    ========================================================= */
 
 function updateTestQuestionNumber() {
-
   const element =
     document.getElementById(
       "testQuestionNumber"
     );
 
-
-  if (!element) {
-    return;
-  }
-
+  if (!element) return;
 
   element.textContent =
     `${testState.currentIndex + 1} / ${testState.questions.length}`;
@@ -3293,71 +2483,49 @@ function updateTestQuestionNumber() {
    ========================================================= */
 
 function clearTestQuestionArea() {
-
   const label =
     document.getElementById(
       "testTypeLabel"
     );
-
 
   const korean =
     document.getElementById(
       "testKorean"
     );
 
-
   const question =
     document.getElementById(
       "testQuestion"
     );
-
 
   const answer =
     document.getElementById(
       "testAnswerArea"
     );
 
-
   const feedback =
     document.getElementById(
       "testFeedback"
     );
-
 
   const nextButton =
     document.getElementById(
       "testNextButton"
     );
 
-
-  label.textContent =
-    "";
-
-  korean.textContent =
-    "";
-
-  question.innerHTML =
-    "";
-
-  answer.innerHTML =
-    "";
-
-  feedback.textContent =
-    "";
-
-  feedback.style.color =
-    "";
-
+  label.textContent = "";
+  korean.textContent = "";
+  question.innerHTML = "";
+  answer.innerHTML = "";
+  feedback.textContent = "";
+  feedback.style.color = "";
 
   feedback.classList.remove(
     "feedback-correct",
-    "feedback-wrong",
-    "try-again"
+    "feedback-wrong"
   );
 
-
   if (nextButton) {
-
     nextButton.classList.add(
       "hidden"
     );
@@ -3369,63 +2537,43 @@ function clearTestQuestionArea() {
    TEST TIMER
    ========================================================= */
 
-function startTestTimer(
-  app
-) {
-
+function startTestTimer(app) {
   const fill =
     document.getElementById(
       "testTimeFill"
     );
 
-
-  if (!fill) {
-    return;
-  }
-
+  if (!fill) return;
 
   fill.style.width =
     "100%";
 
-
   const start =
     performance.now();
 
-
   function animate(now) {
-
     if (
       !testState ||
       testState.locked
     ) {
-
       return;
     }
 
-
     const elapsed =
       now - start;
-
 
     const remaining =
       Math.max(
         0,
         1 -
-        (
-          elapsed /
-          TEST_TIME_LIMIT_MS
-        )
+        elapsed /
+        TEST_TIME_LIMIT_MS
       );
-
 
     fill.style.width =
       `${remaining * 100}%`;
 
-
-    if (
-      remaining > 0
-    ) {
-
+    if (remaining > 0) {
       testAnimationFrame =
         requestAnimationFrame(
           animate
@@ -3433,20 +2581,15 @@ function startTestTimer(
     }
   }
 
-
   testAnimationFrame =
     requestAnimationFrame(
       animate
     );
 
-
   testTimeoutTimer =
     setTimeout(
       () => {
-
-        handleTestTimeout(
-          app
-        );
+        handleTestTimeout(app);
       },
       TEST_TIME_LIMIT_MS
     );
@@ -3458,77 +2601,48 @@ function startTestTimer(
    ========================================================= */
 
 function clearTestTimers() {
-
-  if (
-    testTimeoutTimer
-  ) {
-
+  if (testTimeoutTimer) {
     clearTimeout(
       testTimeoutTimer
     );
 
-    testTimeoutTimer =
-      null;
+    testTimeoutTimer = null;
   }
 
-
-  if (
-    testAnimationFrame
-  ) {
-
+  if (testAnimationFrame) {
     cancelAnimationFrame(
       testAnimationFrame
     );
 
-    testAnimationFrame =
-      null;
+    testAnimationFrame = null;
   }
 }
 
 
 /* =========================================================
-   TEST FINAL ANSWER
+   TEST ANSWER COMMON
    ========================================================= */
-
-/*
-  Test에서는 자동으로 다음 문제로 가지 않는다.
-
-  정답 / 오답 확정
-  →
-  timer stop
-  →
-  정답 공개
-  →
-  Next 버튼
-*/
 
 function submitTestAnswer(
   app,
   isCorrect,
   reveal
 ) {
-
   if (
     !testState ||
     testState.locked
   ) {
-
     return;
   }
 
-
-  testState.locked =
-    true;
-
+  testState.locked = true;
 
   clearTestTimers();
-
 
   if (
     typeof reveal ===
     "function"
   ) {
-
     reveal(
       isCorrect
         ? "correct"
@@ -3536,19 +2650,13 @@ function submitTestAnswer(
     );
   }
 
-
   const feedback =
     document.getElementById(
       "testFeedback"
     );
 
-
-  if (
-    isCorrect
-  ) {
-
+  if (isCorrect) {
     testState.score++;
-
 
     showFeedback(
       feedback,
@@ -3556,15 +2664,10 @@ function submitTestAnswer(
       "correct"
     );
 
-
-    playSound(
-      "correct"
-    );
+    playSound("correct");
 
   } else {
-
     addCurrentQuestionToReview();
-
 
     showFeedback(
       feedback,
@@ -3572,12 +2675,8 @@ function submitTestAnswer(
       "wrong"
     );
 
-
-    playSound(
-      "wrong"
-    );
+    playSound("wrong");
   }
-
 
   showTestNextButton();
 }
@@ -3587,46 +2686,34 @@ function submitTestAnswer(
    TEST TIMEOUT
    ========================================================= */
 
-function handleTestTimeout(
-  app
-) {
-
+function handleTestTimeout(app) {
   if (
     !testState ||
     testState.locked
   ) {
-
     return;
   }
 
-
-  testState.locked =
-    true;
-
+  testState.locked = true;
 
   clearTestTimers();
 
-
   if (
     typeof
-      testState.currentReveal ===
-      "function"
+    testState.currentReveal ===
+    "function"
   ) {
-
     testState.currentReveal(
       "timeout"
     );
   }
 
-
   addCurrentQuestionToReview();
-
 
   const feedback =
     document.getElementById(
       "testFeedback"
     );
-
 
   showFeedback(
     feedback,
@@ -3634,11 +2721,7 @@ function handleTestTimeout(
     "wrong"
   );
 
-
-  playSound(
-    "wrong"
-  );
-
+  playSound("wrong");
 
   showTestNextButton();
 }
@@ -3649,39 +2732,26 @@ function handleTestTimeout(
    ========================================================= */
 
 function showTestNextButton() {
-
   const button =
     document.getElementById(
       "testNextButton"
     );
 
-
-  if (!button) {
-    return;
-  }
-
+  if (!button) return;
 
   button.classList.remove(
     "hidden"
   );
-
-
-  /*
-    마지막 문제에서는
-    버튼 문구를 Result로
-  */
 
   if (
     testState &&
     testState.currentIndex ===
     testState.questions.length - 1
   ) {
-
     button.textContent =
       "See Result →";
 
   } else {
-
     button.textContent =
       "Next →";
   }
@@ -3692,21 +2762,12 @@ function showTestNextButton() {
    ADVANCE TEST
    ========================================================= */
 
-function advanceTestQuestion(
-  app
-) {
-
-  if (!testState) {
-    return;
-  }
-
+function advanceTestQuestion(app) {
+  if (!testState) return;
 
   testState.currentIndex++;
 
-
-  showNextTestQuestion(
-    app
-  );
+  showNextTestQuestion(app);
 }
 
 
@@ -3715,51 +2776,29 @@ function advanceTestQuestion(
    ========================================================= */
 
 function addCurrentQuestionToReview() {
-
-  if (!testState) {
-    return;
-  }
-
-
   const item =
     testState.questions[
       testState.currentIndex
     ];
 
-
-  if (!item) {
-    return;
-  }
-
-
-  /*
-    Text Sequence는 한 문제에
-    4개 문장이 포함됨
-  */
+  if (!item) return;
 
   if (
     item.type ===
     "TEXT_SEQUENCE"
   ) {
-
     item.rows.forEach(
-      row => {
-
+      row =>
         addReviewSentence(
           cleanEnglish(
             row.english
           )
-        );
-      }
+        )
     );
-
-
     return;
   }
 
-
   if (item.row) {
-
     addReviewSentence(
       cleanEnglish(
         item.row.english
@@ -3768,33 +2807,19 @@ function addCurrentQuestionToReview() {
   }
 }
 
-
-function addReviewSentence(
-  sentence
-) {
-
-  if (!sentence) {
-    return;
-  }
-
+function addReviewSentence(sentence) {
+  if (!sentence) return;
 
   if (
-    testState
-      .reviewSentences
-      .includes(
-        sentence
-      )
+    testState.reviewSentences
+      .includes(sentence)
   ) {
-
     return;
   }
 
-
-  testState
-    .reviewSentences
-    .push(
-      sentence
-    );
+  testState.reviewSentences.push(
+    sentence
+  );
 }
 
 
@@ -3805,32 +2830,21 @@ function addReviewSentence(
    =========================================================
    ========================================================= */
 
-function getBlankCandidates(
-  raw
-) {
-
-  const excludedRanges =
-    [];
-
+function getBlankCandidates(raw) {
+  const excludedRanges = [];
 
   const exclusionRegex =
     /\*\*(.*?)\*\*/g;
 
-
   let exclusionMatch;
-
 
   while (
     (
       exclusionMatch =
-        exclusionRegex.exec(
-          raw
-        )
+        exclusionRegex.exec(raw)
     ) !== null
   ) {
-
     excludedRanges.push({
-
       start:
         exclusionMatch.index,
 
@@ -3840,51 +2854,34 @@ function getBlankCandidates(
     });
   }
 
-
-  const candidates =
-    [];
-
+  const candidates = [];
 
   const wordRegex =
     /[A-Za-z]{4,}/g;
 
-
   let match;
-
 
   while (
     (
       match =
-        wordRegex.exec(
-          raw
-        )
+        wordRegex.exec(raw)
     ) !== null
   ) {
-
     const start =
       match.index;
-
 
     const insideExcluded =
       excludedRanges.some(
         range =>
-          start >=
-            range.start &&
-          start <
-            range.end
+          start >= range.start &&
+          start < range.end
       );
 
-
-    if (
-      insideExcluded
-    ) {
-
+    if (insideExcluded) {
       continue;
     }
 
-
     candidates.push({
-
       word:
         match[0],
 
@@ -3897,31 +2894,25 @@ function getBlankCandidates(
     });
   }
 
-
   return candidates;
 }
-
 
 function renderRandomBlankTest(
   app,
   item
 ) {
-
   const row =
     item.row;
-
 
   const candidates =
     getBlankCandidates(
       row.english
     );
 
-
   const target =
     randomChoice(
       candidates
     );
-
 
   const rawWithBlank =
     row.english.slice(
@@ -3933,7 +2924,6 @@ function renderRandomBlankTest(
       target.end
     );
 
-
   document
     .getElementById(
       "testTypeLabel"
@@ -3941,18 +2931,16 @@ function renderRandomBlankTest(
     .textContent =
       "Random Blank";
 
-
   /*
-    한국어 뜻 표시
+    빈칸 채우기:
+    문제 풀이 중 한국어 뜻 표시
   */
-
   document
     .getElementById(
       "testKorean"
     )
     .textContent =
       row.korean.trim();
-
 
   document
     .getElementById(
@@ -3963,12 +2951,10 @@ function renderRandomBlankTest(
         rawWithBlank
       );
 
-
   const area =
     document.getElementById(
       "testAnswerArea"
     );
-
 
   area.innerHTML = `
     <form
@@ -4002,86 +2988,79 @@ function renderRandomBlankTest(
     ></div>
   `;
 
-
   const input =
     document.getElementById(
       "blankInput"
     );
-
 
   const form =
     document.getElementById(
       "blankForm"
     );
 
-
   const answerButton =
     document.getElementById(
       "blankAnswerButton"
     );
-
 
   const correctAnswer =
     document.getElementById(
       "blankCorrectAnswer"
     );
 
-
   function reveal() {
-
-    input.disabled =
-      true;
-
-
-    answerButton.disabled =
-      true;
-
+    input.disabled = true;
+    answerButton.disabled = true;
 
     correctAnswer.innerHTML = `
-      <div>
+      <div class="answer-line">
         Answer:
         <strong>
           ${escapeHTML(target.word)}
         </strong>
       </div>
+
+      <div class="answer-full-sentence">
+        ${escapeHTML(
+          cleanEnglish(
+            row.english
+          )
+        )}
+      </div>
+
+      <div class="answer-korean">
+        ${escapeHTML(
+          row.korean.trim()
+        )}
+      </div>
     `;
   }
-
 
   testState.currentReveal =
     reveal;
 
-
   form.addEventListener(
     "submit",
     event => {
-
       event.preventDefault();
-
 
       if (
         testState.locked
       ) {
-
         return;
       }
-
 
       const answer =
         input.value
           .trim()
           .toLowerCase();
 
-
-      if (!answer) {
-        return;
-      }
-
+      if (!answer) return;
 
       const isCorrect =
         answer ===
-        target.word.toLowerCase();
-
+        target.word
+          .toLowerCase();
 
       submitTestAnswer(
         app,
@@ -4091,14 +3070,12 @@ function renderRandomBlankTest(
     }
   );
 
-
   setTimeout(
     () => {
-
       if (
+        testState &&
         !testState.locked
       ) {
-
         input.focus();
       }
     },
@@ -4110,70 +3087,88 @@ function renderRandomBlankTest(
 /* =========================================================
    =========================================================
    TEST TYPE 2
-   SENTENCE ORDERING
+   UNSCRAMBLE SENTENCE
    =========================================================
    ========================================================= */
 
-function getChunks(
-  raw
-) {
-
+function getChunks(raw) {
   return String(raw)
-    .split(
-      " / "
-    )
+    .split(" / ")
     .map(
       chunk =>
-        cleanEnglish(
-          chunk
-        )
+        cleanEnglish(chunk)
     )
-    .filter(
-      Boolean
-    );
+    .filter(Boolean);
 }
 
 
-/* =========================================================
-   SENTENCE ORDERING
-   ========================================================= */
-
 /*
-  위:
-  [ 1 ] [ 2 ] [ 3 ] [ 4 ]
+  Unscramble 문제 선택지에서만 mechanics 힌트 제거.
 
-  아래:
-  shuffled chunks
+  - 문장 첫 알파벳을 소문자화
+  - 마지막 구두점 . ! ? 삭제
 
-  - drag & drop 가능
-  - 모바일에서는 tap으로
-    다음 빈칸에 자동 배치
-  - slot의 chunk를 다시 누르면
-    아래 선택지로 돌아감
+  정답 공개 시에는 원문 그대로 표시.
 */
+function makeUnscrambleDisplayChunks(
+  chunks
+) {
+  const result =
+    [...chunks];
+
+  if (!result.length) {
+    return result;
+  }
+
+  /*
+    문두 대문자 → 소문자
+  */
+  result[0] =
+    result[0].replace(
+      /[A-Za-z]/,
+      letter =>
+        letter.toLowerCase()
+    );
+
+  /*
+    마지막 chunk의 최종 . ! ? 삭제
+  */
+  const lastIndex =
+    result.length - 1;
+
+  result[lastIndex] =
+    result[lastIndex].replace(
+      /[.!?]\s*$/,
+      ""
+    );
+
+  return result;
+}
+
 
 function renderSentenceOrderingTest(
   app,
   item
 ) {
-
   const row =
     item.row;
 
-
-  const chunks =
+  const originalChunks =
     getChunks(
       row.english
     );
 
+  const displayChunks =
+    makeUnscrambleDisplayChunks(
+      originalChunks
+    );
 
   const chunkItems =
-    chunks.map(
+    displayChunks.map(
       (
         text,
         index
       ) => ({
-
         id:
           `chunk-${index}`,
 
@@ -4184,40 +3179,32 @@ function renderSentenceOrderingTest(
       })
     );
 
-
   const shuffled =
     shuffleArray([
       ...chunkItems
     ]);
 
-
-  /*
-    각 slot에는 chunk object 또는 null
-  */
-
   let slots =
     Array(
-      chunks.length
-    ).fill(
-      null
-    );
-
+      originalChunks.length
+    ).fill(null);
 
   document
     .getElementById(
       "testTypeLabel"
     )
     .textContent =
-      "Sentence Ordering";
+      "Unscramble Sentence";
 
-
+  /*
+    풀이 중 한국어 뜻 숨김
+  */
   document
     .getElementById(
       "testKorean"
     )
     .textContent =
-      row.korean.trim();
-
+      "";
 
   document
     .getElementById(
@@ -4226,12 +3213,10 @@ function renderSentenceOrderingTest(
     .textContent =
       "Put the chunks in the correct order.";
 
-
   const area =
     document.getElementById(
       "testAnswerArea"
     );
-
 
   area.innerHTML = `
     <div
@@ -4250,27 +3235,22 @@ function renderSentenceOrderingTest(
     ></div>
   `;
 
-
   const slotsArea =
     document.getElementById(
       "orderingSlots"
     );
-
 
   const optionsArea =
     document.getElementById(
       "orderingOptions"
     );
 
-
   const correctAnswer =
     document.getElementById(
       "orderingCorrectAnswer"
     );
 
-
   function getPlacedIds() {
-
     return new Set(
       slots
         .filter(Boolean)
@@ -4281,72 +3261,55 @@ function renderSentenceOrderingTest(
     );
   }
 
-
   function placeChunk(
     chunk,
     slotIndex
   ) {
-
     if (
+      !testState ||
       testState.locked
     ) {
-
       return;
     }
 
-
     /*
-      같은 chunk가 다른 slot에 있으면 제거
+      동일 chunk가 다른 slot에
+      있었다면 제거.
     */
-
     slots =
       slots.map(
         existing =>
-          existing &&
-          existing.id ===
+          (
+            existing &&
+            existing.id ===
             chunk.id
-
+          )
             ? null
             : existing
       );
 
-
-    /*
-      target slot에 있던 chunk는
-      자동으로 아래 pool로 돌아감
-    */
-
-    slots[
-      slotIndex
-    ] =
+    slots[slotIndex] =
       chunk;
 
-
     renderOrdering();
-
 
     checkOrderingComplete();
   }
 
-
   function placeInNextEmptySlot(
     chunk
   ) {
-
     const emptyIndex =
       slots.findIndex(
         slot =>
           slot === null
       );
 
-
     if (
       emptyIndex === -1
     ) {
-
       return;
     }
-
 
     placeChunk(
       chunk,
@@ -4354,74 +3317,52 @@ function renderSentenceOrderingTest(
     );
   }
 
-
   function removeFromSlot(
     index
   ) {
-
     if (
+      !testState ||
       testState.locked
     ) {
-
       return;
     }
-
 
     slots[index] =
       null;
 
-
     renderOrdering();
   }
 
-
   function renderOrdering() {
-
-    slotsArea.innerHTML =
-      "";
-
-    optionsArea.innerHTML =
-      "";
-
-
-    /*
-      SLOT
-    */
+    slotsArea.innerHTML = "";
+    optionsArea.innerHTML = "";
 
     slots.forEach(
       (
         chunk,
         index
       ) => {
-
         const slot =
           document.createElement(
             "div"
           );
 
-
         slot.className =
           "ordering-slot";
-
 
         slot.dataset.index =
           String(index);
 
-
         slot.addEventListener(
           "dragover",
           event => {
-
             if (
               testState.locked
             ) {
-
               return;
             }
 
-
             event.preventDefault();
-
 
             slot.classList.add(
               "drag-over"
@@ -4429,37 +3370,29 @@ function renderSentenceOrderingTest(
           }
         );
 
-
         slot.addEventListener(
           "dragleave",
           () => {
-
             slot.classList.remove(
               "drag-over"
             );
           }
         );
 
-
         slot.addEventListener(
           "drop",
           event => {
-
             if (
               testState.locked
             ) {
-
               return;
             }
 
-
             event.preventDefault();
-
 
             slot.classList.remove(
               "drag-over"
             );
-
 
             const chunkId =
               event
@@ -4468,7 +3401,6 @@ function renderSentenceOrderingTest(
                   "text/plain"
                 );
 
-
             const dragged =
               chunkItems.find(
                 item =>
@@ -4476,9 +3408,7 @@ function renderSentenceOrderingTest(
                   chunkId
               );
 
-
             if (dragged) {
-
               placeChunk(
                 dragged,
                 index
@@ -4487,62 +3417,49 @@ function renderSentenceOrderingTest(
           }
         );
 
-
         if (!chunk) {
-
           const number =
             document.createElement(
               "span"
             );
 
-
           number.className =
             "ordering-slot-number";
-
 
           number.textContent =
             String(
               index + 1
             );
 
-
           slot.appendChild(
             number
           );
 
         } else {
-
           slot.classList.add(
             "filled"
           );
-
 
           const button =
             document.createElement(
               "button"
             );
 
-
           button.type =
             "button";
-
 
           button.className =
             "ordering-slot-chunk";
 
-
           button.textContent =
             chunk.text;
-
 
           button.draggable =
             true;
 
-
           button.addEventListener(
             "dragstart",
             event => {
-
               event
                 .dataTransfer
                 .setData(
@@ -4552,27 +3469,23 @@ function renderSentenceOrderingTest(
             }
           );
 
-
           /*
-            누르면 slot에서 제거
+            slot 안 chunk를 누르면
+            다시 아래 선택지로 반환.
           */
-
           button.addEventListener(
             "click",
             () => {
-
               removeFromSlot(
                 index
               );
             }
           );
 
-
           slot.appendChild(
             button
           );
         }
-
 
         slotsArea.appendChild(
           slot
@@ -4580,55 +3493,43 @@ function renderSentenceOrderingTest(
       }
     );
 
-
     /*
-      아직 사용하지 않은 chunk만
-      아래 선택지에 표시
+      이미 사용한 chunk는
+      아래 선택지에서 사라짐.
     */
-
     const placedIds =
       getPlacedIds();
 
-
     shuffled.forEach(
       chunk => {
-
         if (
           placedIds.has(
             chunk.id
           )
         ) {
-
           return;
         }
-
 
         const button =
           document.createElement(
             "button"
           );
 
-
         button.type =
           "button";
-
 
         button.className =
           "test-option ordering-chunk";
 
-
         button.textContent =
           chunk.text;
-
 
         button.draggable =
           true;
 
-
         button.addEventListener(
           "dragstart",
           event => {
-
             event
               .dataTransfer
               .setData(
@@ -4638,22 +3539,18 @@ function renderSentenceOrderingTest(
           }
         );
 
-
         /*
-          모바일 / 태블릿:
-          누르면 다음 빈 slot으로
+          휴대폰:
+          탭하면 다음 빈 slot으로 이동.
         */
-
         button.addEventListener(
           "click",
           () => {
-
             placeInNextEmptySlot(
               chunk
             );
           }
         );
-
 
         optionsArea.appendChild(
           button
@@ -4662,19 +3559,13 @@ function renderSentenceOrderingTest(
     );
   }
 
-
   function checkOrderingComplete() {
-
     const complete =
-      slots.every(
-        Boolean
-      );
-
+      slots.every(Boolean);
 
     if (!complete) {
       return;
     }
-
 
     const isCorrect =
       slots.every(
@@ -4686,7 +3577,10 @@ function renderSentenceOrderingTest(
           index
       );
 
-
+    /*
+      Unscramble은 첫 완성 답으로
+      정오 판정.
+    */
     submitTestAnswer(
       app,
       isCorrect,
@@ -4694,42 +3588,83 @@ function renderSentenceOrderingTest(
     );
   }
 
-
   function reveal() {
-
     /*
-      정답 순서로 slot 재배치
+      정답 공개 시에는
+      mechanics를 제거하지 않은
+      교과서 원문을 보여준다.
     */
 
-    slots =
-      [...chunkItems];
+    slotsArea.innerHTML = "";
+    optionsArea.innerHTML = "";
 
+    originalChunks.forEach(
+      (
+        chunk,
+        index
+      ) => {
+        const slot =
+          document.createElement(
+            "div"
+          );
 
-    renderOrdering();
+        slot.className =
+          "ordering-slot filled";
 
+        const number =
+          document.createElement(
+            "span"
+          );
 
-    correctAnswer.textContent =
-      `Answer: ${chunks.join(" ")}`;
+        number.className =
+          "ordering-slot-number";
 
+        number.textContent =
+          String(
+            index + 1
+          );
 
-    disableElements(
-      slotsArea.querySelectorAll(
-        "button"
-      )
+        const text =
+          document.createElement(
+            "div"
+          );
+
+        text.className =
+          "ordering-slot-chunk";
+
+        text.textContent =
+          chunk;
+
+        slot.append(
+          number,
+          text
+        );
+
+        slotsArea.appendChild(
+          slot
+        );
+      }
     );
 
+    correctAnswer.innerHTML = `
+      <div class="answer-full-sentence">
+        ${escapeHTML(
+          cleanEnglish(
+            row.english
+          )
+        )}
+      </div>
 
-    disableElements(
-      optionsArea.querySelectorAll(
-        "button"
-      )
-    );
+      <div class="answer-korean">
+        ${escapeHTML(
+          row.korean.trim()
+        )}
+      </div>
+    `;
   }
-
 
   testState.currentReveal =
     reveal;
-
 
   renderOrdering();
 }
@@ -4742,66 +3677,49 @@ function renderSentenceOrderingTest(
    =========================================================
    ========================================================= */
 
-function extractErrorSpans(
-  raw
-) {
-
-  const matches =
-    [];
-
+function extractErrorSpans(raw) {
+  const matches = [];
 
   const regex =
     /\{([^{}]+)\}/g;
 
-
   let match;
-
 
   while (
     (
       match =
-        regex.exec(
-          raw
-        )
+        regex.exec(raw)
     ) !== null
   ) {
-
     matches.push(
       match[1]
     );
   }
 
-
   return matches;
 }
-
 
 function renderFindErrorTest(
   app,
   item
 ) {
-
   const row =
     item.row;
-
 
   const correctSpans =
     extractErrorSpans(
       row.english
     );
 
-
   const wrongChoices =
     splitSemicolon(
       row.error_choices
     );
 
-
   const wrongIndex =
     Math.floor(
       Math.random() * 4
     );
-
 
   document
     .getElementById(
@@ -4810,25 +3728,20 @@ function renderFindErrorTest(
     .textContent =
       "Find the Error";
 
-
   /*
-    이 유형은 한국어 뜻을
-    문제에서 이미 제공
+    풀이 중 한국어 뜻 숨김
   */
-
   document
     .getElementById(
       "testKorean"
     )
     .textContent =
-      row.korean.trim();
-
+      "";
 
   const questionArea =
     document.getElementById(
       "testQuestion"
     );
-
 
   document
     .getElementById(
@@ -4841,31 +3754,20 @@ function renderFindErrorTest(
       ></div>
     `;
 
-
   const correctAnswer =
     document.getElementById(
       "errorCorrectAnswer"
     );
 
+  const buttons = [];
 
-  const buttons =
-    [];
-
-
-  let candidateIndex =
-    0;
-
-
-  let lastIndex =
-    0;
-
+  let candidateIndex = 0;
+  let lastIndex = 0;
 
   const regex =
     /\{([^{}]+)\}/g;
 
-
   let match;
-
 
   while (
     (
@@ -4875,13 +3777,11 @@ function renderFindErrorTest(
         )
     ) !== null
   ) {
-
     const before =
       row.english.slice(
         lastIndex,
         match.index
       );
-
 
     questionArea.appendChild(
       document.createTextNode(
@@ -4891,68 +3791,53 @@ function renderFindErrorTest(
       )
     );
 
-
     const button =
       document.createElement(
         "button"
       );
 
-
     button.type =
       "button";
 
-
     button.className =
       "error-choice";
-
 
     const correctText =
       cleanEnglish(
         match[1]
       );
 
-
     const displayText =
       candidateIndex ===
       wrongIndex
-
         ? wrongChoices[
             candidateIndex
           ]
-
         : correctText;
-
 
     button.textContent =
       displayText;
 
-
     const thisIndex =
       candidateIndex;
-
 
     button.addEventListener(
       "click",
       () => {
-
         if (
           testState.locked
         ) {
-
           return;
         }
-
 
         const isCorrect =
           thisIndex ===
           wrongIndex;
 
-
         submitTestAnswer(
           app,
           isCorrect,
           mode => {
-
             revealError(
               mode,
               button,
@@ -4963,24 +3848,19 @@ function renderFindErrorTest(
       }
     );
 
-
     buttons.push(
       button
     );
-
 
     questionArea.appendChild(
       button
     );
 
-
     candidateIndex++;
-
 
     lastIndex =
       regex.lastIndex;
   }
-
 
   questionArea.appendChild(
     document.createTextNode(
@@ -4992,42 +3872,27 @@ function renderFindErrorTest(
     )
   );
 
-
   function revealError(
     mode,
     selectedButton = null,
     selectedIndex = -1
   ) {
-
     buttons.forEach(
       (
         button,
         index
       ) => {
-
         button.disabled =
           true;
-
-
-        /*
-          실제로 틀리게 만들어진 표현
-        */
 
         if (
           index ===
           wrongIndex
         ) {
-
           button.classList.add(
             "wrong"
           );
         }
-
-
-        /*
-          학생이 다른 부분을 눌렀다면
-          그 부분도 selected-wrong 표시
-        */
 
         if (
           selectedButton &&
@@ -5036,7 +3901,6 @@ function renderFindErrorTest(
           index ===
             selectedIndex
         ) {
-
           button.classList.add(
             "selected-wrong"
           );
@@ -5044,9 +3908,12 @@ function renderFindErrorTest(
       }
     );
 
-
+    /*
+      정답 공개 때
+      전체 원문 + 한국어 뜻 제시.
+    */
     correctAnswer.innerHTML = `
-      <div>
+      <div class="answer-line">
         Correct:
         <strong>
           ${escapeHTML(
@@ -5056,16 +3923,26 @@ function renderFindErrorTest(
           )}
         </strong>
       </div>
+
+      <div class="answer-full-sentence">
+        ${escapeHTML(
+          cleanEnglish(
+            row.english
+          )
+        )}
+      </div>
+
+      <div class="answer-korean">
+        ${escapeHTML(
+          row.korean.trim()
+        )}
+      </div>
     `;
   }
 
-
   testState.currentReveal =
     mode => {
-
-      revealError(
-        mode
-      );
+      revealError(mode);
     };
 }
 
@@ -5073,36 +3950,34 @@ function renderFindErrorTest(
 /* =========================================================
    =========================================================
    TEST TYPE 4
-   TEXT SEQUENCE
+   ORDER SENTENCES / TEXT SEQUENCE
    =========================================================
    ========================================================= */
 
 /*
-  - 문장 앞 둥근 사각형 번호칸
-  - 문장 전체를 눌러도 선택 가능
-  - 선택 순서대로 1,2,3,4
-  - 이미 선택한 문장을 다시 누르면
-    해당 번호와 그 뒤 선택 모두 삭제
+  1번 문장은 맨 위에 고정.
 
-  4개를 모두 선택했는데 오답:
-  - 채점 확정 X
+  학생은 나머지 3문장만
+  2 → 3 → 4 순서로 선택.
+
+  잘못된 순서 완성:
+  - 최종 오답 아님
   - timer 계속
-  - 모든 블록 shake
+  - 2~4 선택 블록 shake
   - Try again!
-  - 선택 초기화
+  - 2~4 선택 초기화
 
   정답 또는 timeout:
-  - 문장을 정답 순서대로 1~4 재정렬
+  - 전체를 1~4 정답 순서로 재정렬
+  - 한국어 뜻도 모두 표시
 */
 
 function renderTextSequenceTest(
   app,
   item
 ) {
-
   const rows =
     item.rows;
-
 
   const correctItems =
     rows.map(
@@ -5110,7 +3985,6 @@ function renderTextSequenceTest(
         row,
         index
       ) => ({
-
         row,
 
         id:
@@ -5129,30 +4003,30 @@ function renderTextSequenceTest(
       })
     );
 
+  const firstItem =
+    correctItems[0];
 
-  const choices =
-    shuffleArray([
-      ...correctItems
-    ]);
-
+  /*
+    2~4번만 shuffle.
+  */
+  const remainingChoices =
+    shuffleArray(
+      correctItems.slice(1)
+    );
 
   let selected =
     [];
-
 
   document
     .getElementById(
       "testTypeLabel"
     )
     .textContent =
-      "Text Sequence";
-
+      "Order Sentences";
 
   /*
-    문제를 푸는 동안에는
-    한국어 뜻 표시 안 함
+    풀이 중 한국어 뜻 숨김.
   */
-
   document
     .getElementById(
       "testKorean"
@@ -5160,20 +4034,17 @@ function renderTextSequenceTest(
     .textContent =
       "";
 
-
   document
     .getElementById(
       "testQuestion"
     )
     .textContent =
-      "Put the sentences in the correct order.";
-
+      "Put the remaining sentences in the correct order.";
 
   const area =
     document.getElementById(
       "testAnswerArea"
     );
-
 
   area.innerHTML = `
     <div
@@ -5192,141 +4063,201 @@ function renderTextSequenceTest(
     ></div>
   `;
 
-
   const optionsArea =
     document.getElementById(
       "sequenceOptions"
     );
-
 
   const tryAgain =
     document.getElementById(
       "sequenceTryAgain"
     );
 
-
   const correctAnswer =
     document.getElementById(
       "sequenceCorrectAnswer"
     );
 
+  let resetTimer = null;
 
-  let retryResetTimer =
-    null;
-
-
-  function renderSequence(
-    displayChoices = choices
+  function createSequenceBlock(
+    choice,
+    number,
+    options = {}
   ) {
+    const {
+      fixed = false,
+      answerMode = false
+    } = options;
 
-    optionsArea.innerHTML =
-      "";
+    const element =
+      document.createElement(
+        answerMode
+          ? "div"
+          : "button"
+      );
 
+    if (!answerMode) {
+      element.type =
+        "button";
+    }
 
-    displayChoices.forEach(
+    element.className =
+      "sequence-option";
+
+    if (
+      fixed ||
+      answerMode
+    ) {
+      element.classList.add(
+        "sequence-correct-order"
+      );
+    }
+
+    if (
+      number !== null
+    ) {
+      element.classList.add(
+        "selected"
+      );
+    }
+
+    const numberBox =
+      document.createElement(
+        "span"
+      );
+
+    numberBox.className =
+      "sequence-number-box";
+
+    numberBox.textContent =
+      number !== null
+        ? String(number)
+        : "";
+
+    const content =
+      document.createElement(
+        "div"
+      );
+
+    content.className =
+      "sequence-answer-content";
+
+    const english =
+      document.createElement(
+        "div"
+      );
+
+    english.className =
+      "sequence-sentence-text";
+
+    english.textContent =
+      choice.text;
+
+    content.appendChild(
+      english
+    );
+
+    if (answerMode) {
+      const korean =
+        document.createElement(
+          "div"
+        );
+
+      korean.className =
+        "sequence-korean-answer";
+
+      korean.textContent =
+        choice.korean;
+
+      content.appendChild(
+        korean
+      );
+    }
+
+    element.append(
+      numberBox,
+      content
+    );
+
+    return element;
+  }
+
+  function renderSequence() {
+    optionsArea.innerHTML = "";
+
+    /*
+      1번은 정답 문장을 고정.
+    */
+    const firstBlock =
+      createSequenceBlock(
+        firstItem,
+        1,
+        {
+          fixed: true
+        }
+      );
+
+    firstBlock.disabled =
+      true;
+
+    optionsArea.appendChild(
+      firstBlock
+    );
+
+    /*
+      2~4번 후보.
+    */
+    remainingChoices.forEach(
       choice => {
-
         const selectedIndex =
           selected.indexOf(
             choice
           );
 
+        const number =
+          selectedIndex !== -1
+            ? selectedIndex + 2
+            : null;
 
         const button =
-          document.createElement(
-            "button"
+          createSequenceBlock(
+            choice,
+            number
           );
-
-
-        button.type =
-          "button";
-
-
-        button.className =
-          "sequence-option";
-
-
-        const numberBox =
-          document.createElement(
-            "span"
-          );
-
-
-        numberBox.className =
-          "sequence-number-box";
-
-
-        numberBox.textContent =
-          selectedIndex !== -1
-
-            ? String(
-                selectedIndex + 1
-              )
-
-            : "";
-
-
-        const sentenceText =
-          document.createElement(
-            "span"
-          );
-
-
-        sentenceText.className =
-          "sequence-sentence-text";
-
-
-        sentenceText.textContent =
-          choice.text;
-
-
-        button.append(
-          numberBox,
-          sentenceText
-        );
-
 
         if (
           selectedIndex !== -1
         ) {
-
           button.classList.add(
             "selected"
           );
         }
 
-
         button.disabled =
           testState.locked;
-
 
         button.addEventListener(
           "click",
           () => {
-
             if (
               testState.locked
             ) {
-
               return;
             }
-
 
             const existingIndex =
               selected.indexOf(
                 choice
               );
 
-
             if (
               existingIndex !== -1
             ) {
-
               /*
-                해당 번호 및
-                이후 번호 모두 삭제
+                다시 클릭:
+                해당 번호와 이후 번호 삭제.
               */
-
               selected =
                 selected.slice(
                   0,
@@ -5334,30 +4265,22 @@ function renderTextSequenceTest(
                 );
 
             } else {
-
               selected.push(
                 choice
               );
             }
 
-
-            tryAgain.textContent =
-              "";
-
+            tryAgain.textContent = "";
 
             renderSequence();
 
-
             if (
-              selected.length ===
-              correctItems.length
+              selected.length === 3
             ) {
-
               checkSequenceAnswer();
             }
           }
         );
-
 
         optionsArea.appendChild(
           button
@@ -5366,9 +4289,7 @@ function renderTextSequenceTest(
     );
   }
 
-
   function checkSequenceAnswer() {
-
     const isCorrect =
       selected.every(
         (
@@ -5376,219 +4297,96 @@ function renderTextSequenceTest(
           index
         ) =>
           choice.originalIndex ===
-          index
+          index + 1
       );
 
-
-    if (
-      isCorrect
-    ) {
-
+    if (isCorrect) {
       submitTestAnswer(
         app,
         true,
         revealSequence
       );
 
-
       return;
     }
 
-
     /*
-      오답 배열은 최종 오답으로
-      처리하지 않고 재시도
+      잘못된 배열은
+      아직 채점 확정 아님.
     */
-
-    playSound(
-      "wrong"
-    );
-
+    playSound("wrong");
 
     tryAgain.textContent =
       "Try again!";
 
-
     tryAgain.style.color =
       FEEDBACK_COLORS.wrong;
 
-
-    tryAgain.classList.add(
-      "show"
-    );
-
-
     const blocks =
-      optionsArea.querySelectorAll(
-        ".sequence-option"
-      );
-
+      [
+        ...optionsArea
+          .querySelectorAll(
+            ".sequence-option"
+          )
+      ].slice(1);
 
     blocks.forEach(
       block => {
-
         block.classList.add(
           "shake"
         );
       }
     );
 
+    if (resetTimer) {
+      clearTimeout(
+        resetTimer
+      );
+    }
 
-    /*
-      진동 후 번호 초기화
-      timer는 계속 진행
-    */
-
-    retryResetTimer =
+    resetTimer =
       setTimeout(
         () => {
-
           if (
             !testState ||
             testState.locked
           ) {
-
             return;
           }
 
-
-          selected =
-            [];
-
+          selected = [];
 
           renderSequence();
 
-
           tryAgain.textContent =
             "Try again!";
-
         },
         600
       );
   }
 
-
-  function revealSequence(
-    mode
-  ) {
-
-    if (
-      retryResetTimer
-    ) {
-
+  function revealSequence() {
+    if (resetTimer) {
       clearTimeout(
-        retryResetTimer
+        resetTimer
       );
     }
 
-
-    /*
-      정답 순서로 실제 재정렬
-    */
-
-    selected =
-      [...correctItems];
-
-
-    optionsArea.innerHTML =
-      "";
-
+    optionsArea.innerHTML = "";
 
     correctItems.forEach(
       (
         choice,
         index
       ) => {
-
         const block =
-          document.createElement(
-            "div"
+          createSequenceBlock(
+            choice,
+            index + 1,
+            {
+              answerMode: true
+            }
           );
-
-
-        block.className =
-          "sequence-option sequence-correct-order";
-
-
-        const numberBox =
-          document.createElement(
-            "span"
-          );
-
-
-        numberBox.className =
-          "sequence-number-box";
-
-
-        numberBox.textContent =
-          String(
-            index + 1
-          );
-
-
-        const content =
-          document.createElement(
-            "div"
-          );
-
-
-        content.className =
-          "sequence-answer-content";
-
-
-        const english =
-          document.createElement(
-            "div"
-          );
-
-
-        english.className =
-          "sequence-sentence-text";
-
-
-        english.textContent =
-          choice.text;
-
-
-        content.appendChild(
-          english
-        );
-
-
-        /*
-          한국어 뜻은 timeout/오답일 때
-          함께 보여줌
-        */
-
-        if (
-          mode !== "correct"
-        ) {
-
-          const korean =
-            document.createElement(
-              "div"
-            );
-
-
-          korean.className =
-            "sequence-korean-answer";
-
-
-          korean.textContent =
-            choice.korean;
-
-
-          content.appendChild(
-            korean
-          );
-        }
-
-
-        block.append(
-          numberBox,
-          content
-        );
-
 
         optionsArea.appendChild(
           block
@@ -5596,29 +4394,14 @@ function renderTextSequenceTest(
       }
     );
 
+    tryAgain.textContent = "";
 
-    tryAgain.textContent =
-      "";
-
-
-    if (
-      mode === "correct"
-    ) {
-
-      correctAnswer.textContent =
-        "Correct order shown above.";
-
-    } else {
-
-      correctAnswer.textContent =
-        "Correct order and meanings are shown above.";
-    }
+    correctAnswer.textContent =
+      "Correct order and meanings are shown above.";
   }
-
 
   testState.currentReveal =
     revealSequence;
-
 
   renderSequence();
 }
@@ -5631,78 +4414,48 @@ function renderTextSequenceTest(
    =========================================================
    ========================================================= */
 
-function parsePhraseData(
-  row
-) {
-
+function parsePhraseData(row) {
   const raw =
-    row
-      .phrase_distractors
-      .trim();
-
+    row.phrase_distractors.trim();
 
   if (!raw) {
-
     return null;
   }
 
-
   const leadingMatch =
-    raw.match(
-      /^\/+/
-    );
-
+    raw.match(/^\/+/);
 
   const trailingMatch =
-    raw.match(
-      /\/+$/
-    );
-
+    raw.match(/\/+$/);
 
   const leading =
     leadingMatch
       ? leadingMatch[0].length
       : 0;
 
-
   const trailing =
     trailingMatch
       ? trailingMatch[0].length
       : 0;
 
-
   const inner =
     raw
-      .replace(
-        /^\/+/,
-        ""
-      )
-      .replace(
-        /\/+$/,
-        ""
-      );
-
+      .replace(/^\/+/, "")
+      .replace(/\/+$/, "");
 
   const distractors =
-    splitSemicolon(
-      inner
-    );
-
+    splitSemicolon(inner);
 
   const chunks =
     getChunks(
       row.english
     );
 
-
   if (
-    distractors.length <
-    3
+    distractors.length < 3
   ) {
-
     return null;
   }
-
 
   if (
     leading +
@@ -5710,65 +4463,48 @@ function parsePhraseData(
     1 !==
     chunks.length
   ) {
-
     return null;
   }
-
 
   const targetIndex =
     leading;
 
-
   if (
     targetIndex < 0 ||
     targetIndex >=
-      chunks.length
+    chunks.length
   ) {
-
     return null;
   }
 
-
   return {
-
     chunks,
 
     targetIndex,
 
     target:
-      chunks[
-        targetIndex
-      ],
+      chunks[targetIndex],
 
     distractors
   };
 }
 
-
 function renderMissingPhraseTest(
   app,
   item
 ) {
-
   const row =
     item.row;
 
-
   const data =
-    parsePhraseData(
-      row
-    );
-
+    parsePhraseData(row);
 
   const displayChunks =
     [...data.chunks];
 
-
   displayChunks[
     data.targetIndex
-  ] =
-    "_____";
-
+  ] = "_____";
 
   document
     .getElementById(
@@ -5777,35 +4513,28 @@ function renderMissingPhraseTest(
     .textContent =
       "Missing Phrase";
 
-
   /*
-    이 유형은 문제를 풀 때
-    한국어 뜻을 보여주지 않음
+    선택형 빈칸 채우기:
+    문제 풀이 중 한국어 뜻 표시.
   */
-
   document
     .getElementById(
       "testKorean"
     )
     .textContent =
-      "";
-
+      row.korean.trim();
 
   document
     .getElementById(
       "testQuestion"
     )
     .textContent =
-      displayChunks.join(
-        " "
-      );
-
+      displayChunks.join(" ");
 
   const area =
     document.getElementById(
       "testAnswerArea"
     );
-
 
   area.innerHTML = `
     <div
@@ -5819,34 +4548,29 @@ function renderMissingPhraseTest(
     ></div>
   `;
 
-
   const optionsArea =
     document.getElementById(
       "phraseOptions"
     );
-
 
   const correctAnswer =
     document.getElementById(
       "phraseCorrectAnswer"
     );
 
-
   const distractors =
-    shuffleArray([
-      ...data.distractors
-    ]).slice(
+    shuffleArray(
+      [...data.distractors]
+    ).slice(
       0,
       3
     );
-
 
   const options =
     shuffleArray([
       {
         text:
           data.target,
-
         correct:
           true
       },
@@ -5854,56 +4578,42 @@ function renderMissingPhraseTest(
       ...distractors.map(
         text => ({
           text,
-
-          correct:
-            false
+          correct: false
         })
       )
     ]);
 
-
-  const buttons =
-    [];
-
+  const buttons = [];
 
   options.forEach(
     option => {
-
       const button =
         document.createElement(
           "button"
         );
 
-
       button.type =
         "button";
-
 
       button.className =
         "test-option";
 
-
       button.textContent =
         option.text;
-
 
       button.addEventListener(
         "click",
         () => {
-
           if (
             testState.locked
           ) {
-
             return;
           }
-
 
           submitTestAnswer(
             app,
             option.correct,
             mode => {
-
               revealPhrase(
                 mode,
                 button,
@@ -5914,12 +4624,10 @@ function renderMissingPhraseTest(
         }
       );
 
-
       buttons.push({
         button,
         option
       });
-
 
       optionsArea.appendChild(
         button
@@ -5927,27 +4635,20 @@ function renderMissingPhraseTest(
     }
   );
 
-
   function revealPhrase(
     mode,
     selectedButton = null,
     selectedOption = null
   ) {
-
     buttons.forEach(
       ({
         button,
         option
       }) => {
-
         button.disabled =
           true;
 
-
-        if (
-          option.correct
-        ) {
-
+        if (option.correct) {
           button.classList.add(
             "correct"
           );
@@ -5955,77 +4656,50 @@ function renderMissingPhraseTest(
       }
     );
 
-
     if (
       mode !== "correct" &&
       selectedButton &&
       selectedOption &&
       !selectedOption.correct
     ) {
-
       selectedButton.classList.add(
         "wrong"
       );
     }
 
-
-    if (
-      mode === "correct"
-    ) {
-
-      correctAnswer.innerHTML = `
-        <div>
-          Answer:
-          <strong>
-            ${escapeHTML(
-              data.target
-            )}
-          </strong>
-        </div>
-      `;
-
-    } else {
-
-      /*
-        우리말 뜻을 처음에 보여주지 않은 유형이므로
-        오답 / timeout 때
-        정답 + 전체 문장 + 문장 뜻
-      */
-
-      correctAnswer.innerHTML = `
-        <div class="answer-line">
-          Answer:
-          <strong>
-            ${escapeHTML(
-              data.target
-            )}
-          </strong>
-        </div>
-
-        <div class="answer-full-sentence">
+    /*
+      정오 여부와 무관하게
+      정답 공개 시 한국어 뜻까지 표시.
+    */
+    correctAnswer.innerHTML = `
+      <div class="answer-line">
+        Answer:
+        <strong>
           ${escapeHTML(
-            cleanEnglish(
-              row.english
-            )
+            data.target
           )}
-        </div>
+        </strong>
+      </div>
 
-        <div class="answer-korean">
-          ${escapeHTML(
-            row.korean.trim()
-          )}
-        </div>
-      `;
-    }
+      <div class="answer-full-sentence">
+        ${escapeHTML(
+          cleanEnglish(
+            row.english
+          )
+        )}
+      </div>
+
+      <div class="answer-korean">
+        ${escapeHTML(
+          row.korean.trim()
+        )}
+      </div>
+    `;
   }
-
 
   testState.currentReveal =
     mode => {
-
-      revealPhrase(
-        mode
-      );
+      revealPhrase(mode);
     };
 }
 
@@ -6037,89 +4711,44 @@ function renderMissingPhraseTest(
 function getTestAchievement(
   accuracy
 ) {
-
-  if (
-    accuracy === 100
-  ) {
-
+  if (accuracy === 100) {
     return {
-
-      emoji:
-        "👑",
-
-      text:
-        "Excellent Reader!"
+      emoji: "👑",
+      text: "Excellent Reader!"
     };
   }
 
-
-  if (
-    accuracy >= 90
-  ) {
-
+  if (accuracy >= 90) {
     return {
-
-      emoji:
-        "🌟",
-
-      text:
-        "Great Reader!"
+      emoji: "🌟",
+      text: "Great Reader!"
     };
   }
 
-
-  if (
-    accuracy >= 80
-  ) {
-
+  if (accuracy >= 80) {
     return {
-
-      emoji:
-        "👏",
-
-      text:
-        "Good Reader!"
+      emoji: "👏",
+      text: "Good Reader!"
     };
   }
 
-
-  if (
-    accuracy >= 70
-  ) {
-
+  if (accuracy >= 70) {
     return {
-
-      emoji:
-        "📖",
-
-      text:
-        "Keep Reading!"
+      emoji: "📖",
+      text: "Keep Reading!"
     };
   }
 
-
-  if (
-    accuracy >= 50
-  ) {
-
+  if (accuracy >= 50) {
     return {
-
-      emoji:
-        "💪",
-
-      text:
-        "Keep Practicing!"
+      emoji: "💪",
+      text: "Keep Practicing!"
     };
   }
-
 
   return {
-
-    emoji:
-      "🔄",
-
-    text:
-      "Review and Try Again!"
+    emoji: "🔄",
+    text: "Review and Try Again!"
   };
 }
 
@@ -6128,66 +4757,43 @@ function getTestAchievement(
    TEST RESULT SCREEN
    ========================================================= */
 
-function renderTestResult(
-  app
-) {
-
+function renderTestResult(app) {
   clearTestTimers();
-
 
   const total =
     testState.questions.length;
 
-
   const score =
     testState.score;
 
-
   const accuracy =
     Math.round(
-      (
-        score /
-        total
-      ) * 100
+      score /
+      total *
+      100
     );
-
 
   const achievement =
     getTestAchievement(
       accuracy
     );
 
-
   const review =
     testState.reviewSentences;
 
-
   const visibleReview =
-    review.slice(
-      0,
-      5
-    );
-
+    review.slice(0, 5);
 
   const hasMore =
-    review.length >
-    5;
+    review.length > 5;
 
+  playSound("victory");
 
-  playSound(
-    "victory"
-  );
-
-
-  let reviewHTML =
-    "";
-
+  let reviewHTML = "";
 
   if (
-    review.length ===
-    0
+    review.length === 0
   ) {
-
     reviewHTML = `
       <div class="review-none">
         None 🎉
@@ -6195,7 +4801,6 @@ function renderTestResult(
     `;
 
   } else {
-
     reviewHTML =
       visibleReview
         .map(
@@ -6204,16 +4809,13 @@ function renderTestResult(
             index
           ) => `
             <div class="review-sentence">
-              ${index + 1}.
-              ${escapeHTML(sentence)}
+              ${index + 1}. ${escapeHTML(sentence)}
             </div>
           `
         )
         .join("");
 
-
     if (hasMore) {
-
       reviewHTML += `
         <div class="review-more">
           and more...
@@ -6222,18 +4824,14 @@ function renderTestResult(
     }
   }
 
-
   const adviceHTML =
     hasMore
-
       ? `
         <p class="test-result-advice">
           📖 Try Reading Practice again before taking the test.
         </p>
       `
-
       : "";
-
 
   app.innerHTML = `
     <section class="test-result">
@@ -6248,9 +4846,7 @@ function renderTestResult(
         <div class="test-result-summary">
 
           <div>
-            📚 Grade ${GRADE_NUMBER}
-            ·
-            Lesson ${currentLesson.lessonNumber}
+            📚 Grade ${GRADE_NUMBER} · Lesson ${currentLesson.lessonNumber}
           </div>
 
           <div>
@@ -6308,7 +4904,6 @@ function renderTestResult(
     </section>
   `;
 
-
   document
     .getElementById(
       "copyResultButton"
@@ -6318,7 +4913,6 @@ function renderTestResult(
       copyTestResult
     );
 
-
   document
     .getElementById(
       "testAgainButton"
@@ -6326,14 +4920,12 @@ function renderTestResult(
     .addEventListener(
       "click",
       () => {
-
         startReadingTest(
           app,
           currentLesson
         );
       }
     );
-
 
   document
     .getElementById(
@@ -6351,38 +4943,28 @@ function renderTestResult(
    ========================================================= */
 
 async function copyTestResult() {
-
-  if (!testState) {
-    return;
-  }
-
+  if (!testState) return;
 
   const total =
     testState.questions.length;
 
-
   const score =
     testState.score;
 
-
   const accuracy =
     Math.round(
-      (
-        score /
-        total
-      ) * 100
+      score /
+      total *
+      100
     );
-
 
   const achievement =
     getTestAchievement(
       accuracy
     );
 
-
   const review =
     testState.reviewSentences;
-
 
   const visibleReview =
     review.slice(
@@ -6390,59 +4972,41 @@ async function copyTestResult() {
       5
     );
 
-
   const lines = [
-
     `${achievement.emoji} ${achievement.text}`,
-
     `📚 Grade ${GRADE_NUMBER} · Lesson ${currentLesson.lessonNumber}`,
-
     `⭐ Score: ${score}/${total} (🎯 ${accuracy}%)`,
-
     "",
-
     "📝 Sentences to Review:"
   ];
 
-
   if (
-    review.length ===
-    0
+    review.length === 0
   ) {
-
     lines.push(
       "None 🎉"
     );
 
   } else {
-
     visibleReview.forEach(
       (
         sentence,
         index
       ) => {
-
         lines.push(
           `${index + 1}. ${sentence}`
         );
       }
     );
 
-
     if (
-      review.length >
-      5
+      review.length > 5
     ) {
-
       lines.push(
         "and more..."
       );
 
-
-      lines.push(
-        ""
-      );
-
+      lines.push("");
 
       lines.push(
         "📖 Try Reading Practice again before taking the test."
@@ -6450,111 +5014,53 @@ async function copyTestResult() {
     }
   }
 
-
   const text =
-    lines.join(
-      "\n"
-    );
-
-
-  const button =
-    document.getElementById(
-      "copyResultButton"
-    );
-
+    lines.join("\n");
 
   try {
-
     await navigator
       .clipboard
       .writeText(
         text
       );
 
-
-    showCopiedButton(
-      button
-    );
-
   } catch (error) {
-
     fallbackCopyText(
       text
     );
-
-
-    showCopiedButton(
-      button
-    );
   }
+
+  alert(
+    "Reading Test 결과가 복사되었습니다. Padlet에 자랑해 보세요!"
+  );
 }
 
-
-function fallbackCopyText(
-  text
-) {
-
+function fallbackCopyText(text) {
   const textarea =
     document.createElement(
       "textarea"
     );
 
-
-  textarea.value =
-    text;
-
+  textarea.value = text;
 
   textarea.style.position =
     "fixed";
 
-
   textarea.style.opacity =
     "0";
-
 
   document.body.appendChild(
     textarea
   );
 
-
   textarea.select();
-
 
   document.execCommand(
     "copy"
   );
 
-
   document.body.removeChild(
     textarea
-  );
-}
-
-
-function showCopiedButton(
-  button
-) {
-
-  if (!button) {
-    return;
-  }
-
-
-  const original =
-    button.textContent;
-
-
-  button.textContent =
-    "✅ Copied!";
-
-
-  setTimeout(
-    () => {
-
-      button.textContent =
-        original;
-    },
-    1500
   );
 }
 
@@ -6563,21 +5069,14 @@ function showCopiedButton(
    UTILITY: SPLIT SEMICOLON
    ========================================================= */
 
-function splitSemicolon(
-  text
-) {
-
+function splitSemicolon(text) {
   return String(text)
-    .split(
-      ";"
-    )
+    .split(";")
     .map(
       item =>
         item.trim()
     )
-    .filter(
-      Boolean
-    );
+    .filter(Boolean);
 }
 
 
@@ -6585,28 +5084,17 @@ function splitSemicolon(
    UTILITY: WORD COUNT
    ========================================================= */
 
-function countWords(
-  text
-) {
-
+function countWords(text) {
   const cleaned =
-    String(text)
-      .trim();
-
+    String(text).trim();
 
   if (!cleaned) {
-
     return 0;
   }
 
-
   return cleaned
-    .split(
-      /\s+/
-    )
-    .filter(
-      Boolean
-    )
+    .split(/\s+/)
+    .filter(Boolean)
     .length;
 }
 
@@ -6615,34 +5103,10 @@ function countWords(
    UTILITY: DISABLE BUTTONS
    ========================================================= */
 
-function disableButtons(
-  buttons
-) {
-
+function disableButtons(buttons) {
   buttons.forEach(
     button => {
-
-      button.disabled =
-        true;
-    }
-  );
-}
-
-
-function disableElements(
-  elements
-) {
-
-  [...elements].forEach(
-    element => {
-
-      if (
-        "disabled" in element
-      ) {
-
-        element.disabled =
-          true;
-      }
+      button.disabled = true;
     }
   );
 }
@@ -6652,15 +5116,10 @@ function disableElements(
    UTILITY: RANDOM CHOICE
    ========================================================= */
 
-function randomChoice(
-  array
-) {
-
+function randomChoice(array) {
   if (!array.length) {
-
     return null;
   }
-
 
   return array[
     Math.floor(
@@ -6675,10 +5134,7 @@ function randomChoice(
    UTILITY: SHUFFLE
    ========================================================= */
 
-function shuffleArray(
-  array
-) {
-
+function shuffleArray(array) {
   for (
     let i =
       array.length - 1;
@@ -6687,13 +5143,11 @@ function shuffleArray(
 
     i--
   ) {
-
     const j =
       Math.floor(
         Math.random() *
         (i + 1)
       );
-
 
     [
       array[i],
@@ -6704,7 +5158,6 @@ function shuffleArray(
     ];
   }
 
-
   return array;
 }
 
@@ -6713,32 +5166,24 @@ function shuffleArray(
    UTILITY: ESCAPE HTML
    ========================================================= */
 
-function escapeHTML(
-  text
-) {
-
+function escapeHTML(text) {
   return String(text)
-
     .replace(
       /&/g,
       "&amp;"
     )
-
     .replace(
       /</g,
       "&lt;"
     )
-
     .replace(
       />/g,
       "&gt;"
     )
-
     .replace(
       /"/g,
       "&quot;"
     )
-
     .replace(
       /'/g,
       "&#039;"
@@ -6750,10 +5195,7 @@ function escapeHTML(
    LOADING
    ========================================================= */
 
-function showLoading(
-  app
-) {
-
+function showLoading(app) {
   app.innerHTML = `
     <p class="loading">
       Loading reading data...
@@ -6770,52 +5212,39 @@ function renderError(
   app,
   error
 ) {
-
   clearPracticeTimers();
   clearTestTimers();
 
-
-  app.innerHTML =
-    "";
-
+  app.innerHTML = "";
 
   const box =
     document.createElement(
       "div"
     );
 
-
   box.className =
     "error-message";
-
 
   const title =
     document.createElement(
       "h2"
     );
 
-
   title.textContent =
     "Unable to load Reading Trainer";
-
 
   const message =
     document.createElement(
       "p"
     );
 
-
   message.textContent =
     error.message;
-
 
   box.append(
     title,
     message
   );
 
-
-  app.appendChild(
-    box
-  );
+  app.appendChild(box);
 }
