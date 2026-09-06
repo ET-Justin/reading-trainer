@@ -12,9 +12,15 @@ const GRADE_NUMBER =
 const LESSON_NUMBER =
   Number(URL_PARAMS.get("lesson")) || 5;
 
-const DATA_PATH =
-  `data/2022M${GRADE_NUMBER}` +
-  `L${String(LESSON_NUMBER).padStart(2, "0")}R.csv`;
+const DATA_FILE_BASE =
+  `2022M${GRADE_NUMBER}` +
+  `L${String(LESSON_NUMBER).padStart(2, "0")}R`;
+
+let DATA_PATH =
+  `data/${DATA_FILE_BASE}.csv`;
+
+let IS_SPECIAL_LESSON =
+  false;
 
 const MAX_PRACTICE_ROUNDS = 3;
 
@@ -210,11 +216,43 @@ async function init() {
     );
 
 
-    const rows =
-      await loadCSV(
-        DATA_PATH
-      );
+    let rows;
 
+try {
+
+  /*
+    먼저 일반 Lesson 파일 확인
+  */
+
+  DATA_PATH =
+    `data/${DATA_FILE_BASE}.csv`;
+
+  rows =
+    await loadCSV(
+      DATA_PATH
+    );
+
+  IS_SPECIAL_LESSON =
+    false;
+
+} catch (normalError) {
+
+  /*
+    일반 파일이 없으면
+    Special Lesson 파일 확인
+  */
+
+  DATA_PATH =
+    `data/${DATA_FILE_BASE}_SL.csv`;
+
+  rows =
+    await loadCSV(
+      DATA_PATH
+    );
+
+  IS_SPECIAL_LESSON =
+    true;
+}
 
     validateCSV(
       rows
@@ -1098,7 +1136,9 @@ function renderLessonMenu(
 
 
   heading.textContent =
-    `Lesson ${lesson.lessonNumber}. Reading`;
+  IS_SPECIAL_LESSON
+    ? "Special Lesson. Reading"
+    : `Lesson ${lesson.lessonNumber}. Reading`;
 
 
   const title =
@@ -6647,7 +6687,9 @@ function renderTestResult(
           <div>
             📚 Grade ${GRADE_NUMBER}
             ·
-            Lesson ${currentLesson.lessonNumber}
+            ${IS_SPECIAL_LESSON
+               ? "Special Lesson"
+               : `Lesson ${currentLesson.lessonNumber}`}
           </div>
 
           <div>
