@@ -697,6 +697,10 @@ function validateCSV(rows) {
   }
 
 
+  /*
+    필수 열 확인
+  */
+
   for (
     const column
     of requiredColumns
@@ -713,6 +717,10 @@ function validateCSV(rows) {
   }
 
 
+  /*
+    ID 중복 확인
+  */
+
   const ids =
     new Set();
 
@@ -726,7 +734,9 @@ function validateCSV(rows) {
       row.id.trim();
 
 
-    if (!id) {
+    if (
+      !id
+    ) {
 
       throw new Error(
         "ID가 없는 행이 있습니다."
@@ -735,7 +745,9 @@ function validateCSV(rows) {
 
 
     if (
-      ids.has(id)
+      ids.has(
+        id
+      )
     ) {
 
       throw new Error(
@@ -748,8 +760,146 @@ function validateCSV(rows) {
       id
     );
   }
-}
 
+
+  /*
+    본문 듣기 링크 행 확인
+
+    없더라도 Reading Practice / Test는
+    사용할 수 있으므로 오류 대신 경고만 표시한다.
+  */
+
+  const listenRow =
+    rows.find(
+      row =>
+        row.id
+          .trim()
+          .endsWith(
+            "0099"
+          )
+    );
+
+
+  if (
+    !listenRow
+  ) {
+
+    console.warn(
+      "CSV check: ...0099 listening URL row is missing."
+    );
+
+  } else if (
+    !/^https?:\/\//i.test(
+      listenRow.english.trim()
+    )
+  ) {
+
+    console.warn(
+      `CSV check: ${listenRow.id} does not contain a valid HTTP(S) URL.`
+    );
+  }
+
+
+  /*
+    Find the Error 데이터 확인
+
+    error_choices가 있는 행은
+    { } span 4개 + 오답 4개가 있어야 한다.
+  */
+
+  rows.forEach(
+    row => {
+
+      const choices =
+        splitSemicolon(
+          row.error_choices
+        );
+
+
+      if (
+        choices.length === 0
+      ) {
+
+        return;
+      }
+
+
+      const spans =
+        extractErrorSpans(
+          row.english
+        );
+
+
+      if (
+        spans.length !== 4 ||
+        choices.length !== 4
+      ) {
+
+        console.warn(
+          `CSV check: Find the Error data problem at ${row.id}`,
+          {
+            errorSpans:
+              spans.length,
+
+            errorChoices:
+              choices.length
+          }
+        );
+      }
+    }
+  );
+
+
+  /*
+    Missing Phrase 데이터 확인
+
+    phrase_distractors가 있는 행은
+    slash metadata와 chunk 위치가
+    정상적으로 해석되어야 한다.
+  */
+
+  rows.forEach(
+    row => {
+
+      if (
+        !row.phrase_distractors.trim()
+      ) {
+
+        return;
+      }
+
+
+      const parsed =
+        parsePhraseData(
+          row
+        );
+
+
+      if (
+        !parsed
+      ) {
+
+        console.warn(
+          `CSV check: Missing Phrase data problem at ${row.id}`
+        );
+      }
+    }
+  );
+
+
+  console.log(
+    "CSV validation complete:",
+    {
+      rows:
+        rows.length,
+
+      listeningUrl:
+        Boolean(
+          listenRow
+        )
+    }
+  );
+}
 
 /* =========================================================
    LESSON DATA
@@ -1162,62 +1312,102 @@ function renderListenToText(
     "listen-player";
 
 
-  if (
-    lesson.listenUrl
-  ) {
+if (
+  lesson.listenUrl
+) {
 
-    const iframe =
-      document.createElement(
-        "iframe"
-      );
-
-
-    iframe.className =
-      "listen-iframe";
-
-
-    iframe.src =
-      lesson.listenUrl;
-
-
-    iframe.title =
-      `Lesson ${lesson.lessonNumber} Listening`;
-
-
-    iframe.allow =
-      "autoplay; fullscreen";
-
-
-    iframe.allowFullscreen =
-      true;
-
-
-    player.appendChild(
-      iframe
+  const iframe =
+    document.createElement(
+      "iframe"
     );
 
-  } else {
 
-    const unavailable =
-      document.createElement(
-        "p"
-      );
+  iframe.className =
+    "listen-iframe";
 
 
-    unavailable.className =
-      "listen-unavailable";
+  iframe.src =
+    lesson.listenUrl;
 
 
-    unavailable.textContent =
-      "Listening material is not available.";
+  iframe.title =
+    `Lesson ${lesson.lessonNumber} Listening`;
 
 
-    player.appendChild(
-      unavailable
+  iframe.allow =
+    "autoplay; fullscreen";
+
+
+  iframe.allowFullscreen =
+    true;
+
+
+  player.appendChild(
+    iframe
+  );
+
+
+} else {
+
+  const unavailable =
+    document.createElement(
+      "p"
     );
-  }
 
 
+  unavailable.className =
+    "listen-unavailable";
+
+
+  unavailable.textContent =
+    "Listening material is not available.";
+
+
+  player.appendChild(
+    unavailable
+  );
+}
+
+/*
+  iframe이 브라우저 정책이나
+  외부 사이트 문제로 보이지 않을 때를 위한
+  fallback 링크
+*/
+
+let fallbackLink =
+  null;
+
+
+if (
+  lesson.listenUrl
+) {
+
+  fallbackLink =
+    document.createElement(
+      "a"
+    );
+
+
+  fallbackLink.className =
+    "listen-fallback-link";
+
+
+  fallbackLink.href =
+    lesson.listenUrl;
+
+
+  fallbackLink.target =
+    "_blank";
+
+
+  fallbackLink.rel =
+    "noopener noreferrer";
+
+
+  fallbackLink.textContent =
+    "Player not showing? Open the listening page.";
+}
+   
   const copyright =
     document.createElement(
       "p"
@@ -1233,11 +1423,24 @@ function renderListenToText(
 
 
   section.append(
-    topbar,
-    player,
-    copyright
-  );
+  topbar,
+  player
+);
 
+
+if (
+  fallbackLink
+) {
+
+  section.appendChild(
+    fallbackLink
+  );
+}
+
+
+section.appendChild(
+  copyright
+);
 
   app.appendChild(
     section
@@ -2682,7 +2885,34 @@ function buildTestQuestions(
       )
   };
 
+/*
+  Test 문항 후보 수 진단
 
+  새 Lesson CSV를 추가했을 때
+  특정 유형이 출제되지 않는 문제를
+  콘솔에서 바로 확인할 수 있다.
+*/
+
+console.log(
+  `Reading Test banks — Grade ${GRADE_NUMBER}, Lesson ${LESSON_NUMBER}:`,
+  {
+    sentenceBlank:
+      banks.RANDOM_BLANK.length,
+
+    missingPhrase:
+      banks.MISSING_PHRASE.length,
+
+    findError:
+      banks.FIND_ERROR.length,
+
+    orderSentences:
+      banks.TEXT_SEQUENCE.length,
+
+    unscrambleSentence:
+      banks.SENTENCE_ORDERING.length
+  }
+);
+   
   const selected =
     [];
 
